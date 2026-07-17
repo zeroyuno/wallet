@@ -7,17 +7,42 @@ El backend expone una API REST cuyo contrato (endpoints, request/response DTOs, 
 define en la spec/plan de cada feature antes de implementarse. La app Android consume ese contrato
 tal cual — ningún endpoint se improvisa durante la implementación sin reflejarse primero en el plan.
 
-### II. Arquitectura en capas
-Backend: `Controller → Service → Repository`. Los controllers no contienen lógica de negocio; la
-lógica vive en la capa de servicio; el acceso a datos vive solo en repositories (Spring Data JPA).
-Android: MVVM — `Composable (UI) → ViewModel → Repository → API (Retrofit)`. Los Composables no
-llaman directamente a la red ni contienen lógica de negocio.
+### II. Arquitectura hexagonal y DDD (monolito modular)
+El backend es un único desplegable Spring Boot organizado como **monolito modular**: dividido en
+módulos por *bounded context* (ej. `auth`, `accounts`, `categories`, y los que vengan después). Cada
+módulo sigue arquitectura hexagonal (ports & adapters):
 
-### III. Tests sobre lógica de negocio (NON-NEGOTIABLE)
-Backend: cada servicio con lógica de negocio lleva tests unitarios (JUnit 5); los endpoints y el
-acceso a datos llevan tests de integración con Testcontainers (Postgres real, no mocks de BD).
-Android: cada ViewModel con lógica lleva tests unitarios. No se implementa una feature como
-"completa" sin sus tests correspondientes.
+- `domain/`: entidades, value objects, agregados y reglas de negocio puras, más las interfaces de
+  repositorio (puertos de salida). Sin dependencias de Spring, JPA ni de ningún framework.
+- `application/`: casos de uso (application services) que orquestan el dominio; los puertos de
+  entrada que consume la infraestructura.
+- `infrastructure/`: adaptadores — controllers REST (adaptador de entrada), repositorios JPA
+  (adaptador de salida), y cualquier cliente externo.
+
+Un módulo/bounded context NUNCA importa clases de `domain` o `infrastructure` de otro módulo
+directamente; la comunicación entre contextos pasa por la capa `application` (casos de uso expuestos)
+o eventos de dominio. Esta regla se verifica con tests de arquitectura (ArchUnit), no solo por
+convención.
+
+Este diseño existe para poder extraerse a microservicios reales en el futuro si el proyecto lo
+justifica, cambiando solo los adaptadores de infraestructura — sin reescribir el dominio. Mientras
+tanto, se despliega como un único servicio (evita la complejidad operativa de microservicios que el
+alcance actual no justifica).
+
+Android: mantiene MVVM sin cambios — `Composable (UI) → ViewModel → Repository → API (Retrofit)`. Es
+una capa de presentación consumidora de la API; DDD/hexagonal aplica solo al backend.
+
+### III. Tests sobre lógica de negocio y cobertura mínima (NON-NEGOTIABLE)
+Backend: `domain` y `application` de cada módulo DEBEN tener cobertura de línea **mayor al 80%**
+(medida con JaCoCo, verificada en el build — un build que baje del umbral falla). Los adaptadores de
+`infrastructure` (controllers, repositorios JPA) se cubren con tests de integración con Testcontainers
+(Postgres real, no mocks de BD). Tests de arquitectura (ArchUnit) verifican que `domain` no dependa de
+frameworks y que no haya imports cruzados entre bounded contexts.
+
+Android: cada ViewModel con lógica lleva tests unitarios.
+
+No se implementa una feature como "completa" sin sus tests correspondientes y sin cumplir el umbral de
+cobertura.
 
 ### IV. Aislamiento de datos por usuario
 La app es multi-usuario. Toda entidad de dominio (cuentas, categorías, y las que vengan después)
@@ -32,7 +57,8 @@ presupuestos, recurrencias, reportes) hasta que tengan su propia spec aprobada. 
 ## Stack tecnológico
 
 **Backend**: Java 25, Spring Boot 4.1.0, Maven, Spring Web, Spring Data JPA, Spring Security (JWT),
-PostgreSQL, Flyway (migraciones), JUnit 5 + Testcontainers.
+PostgreSQL, Flyway (migraciones), JUnit 5 + Testcontainers, ArchUnit (reglas de arquitectura), JaCoCo
+(cobertura, umbral 80% en `domain`/`application`).
 
 **Android**: Kotlin, Jetpack Compose (nativo, sin Kotlin Multiplatform por ahora), arquitectura MVVM,
 Hilt (DI), Retrofit + OkHttp, Coroutines/Flow.
@@ -47,6 +73,9 @@ Hilt (DI), Retrofit + OkHttp, Coroutines/Flow.
 - El primer feature es autenticación (registro/login, JWT) por ser prerrequisito de todo lo demás.
 - El backend y el Android app son proyectos independientes dentro del mismo repo (`backend/`,
   `android/`), acoplados solo por el contrato de API — pueden evolucionar y desplegarse por separado.
+- Convención de paquetes por bounded context en el backend:
+  `com.walletapp.backend.<contexto>.{domain,application,infrastructure}`. El `plan.md` de cada
+  feature DEBE mapear sus entidades/casos de uso a esta estructura antes de implementarse.
 
 ## Governance
 
@@ -54,4 +83,4 @@ Esta constitución tiene prioridad sobre decisiones ad-hoc durante la implementa
 excepción a un principio debe justificarse explícitamente en el `plan.md` del feature correspondiente.
 Enmiendas a este documento requieren bump de versión y quedan documentadas en el historial de git.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-17 | **Last Amended**: 2026-07-17
+**Version**: 2.0.0 | **Ratified**: 2026-07-17 | **Last Amended**: 2026-07-17

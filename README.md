@@ -25,9 +25,27 @@ Este proyecto se desarrolla con **Spec-Driven Development** usando
 Los principios del proyecto (stack, arquitectura, testing) están documentados en
 [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 
+## Arquitectura del backend
+
+Monolito modular: un único desplegable, dividido en módulos por *bounded context*
+(`com.walletapp.backend.<contexto>`), cada uno con arquitectura hexagonal:
+
+```
+<contexto>/
+  domain/           # entidades, value objects, reglas de negocio — sin dependencias de Spring/JPA
+  application/       # casos de uso que orquestan el dominio
+  infrastructure/    # adaptadores: controllers REST, repositorios JPA
+```
+
+Ningún módulo importa `domain`/`infrastructure` de otro directamente (verificado con ArchUnit). Este
+diseño permite extraer un contexto a un microservicio real más adelante si el proyecto lo justifica,
+sin reescribir el dominio. `domain` y `application` requieren >80% de cobertura (JaCoCo, verificado en
+`mvn verify`).
+
 ## Stack
 
-**Backend**: Java 25, Spring Boot 4.1.0, Spring Data JPA, Spring Security (JWT), PostgreSQL, Flyway.
+**Backend**: Java 25, Spring Boot 4.1.0, Spring Data JPA, Spring Security (JWT), PostgreSQL, Flyway,
+ArchUnit, JaCoCo.
 
 **Android**: Kotlin, Jetpack Compose, MVVM, Hilt, Retrofit.
 
