@@ -1,5 +1,7 @@
 package com.walletapp.android.di
 
+import com.walletapp.android.auth.AuthApi
+import com.walletapp.android.data.TokenStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,8 +27,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient =
+    fun provideOkHttpClient(tokenStore: TokenStore): OkHttpClient =
         OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val token = tokenStore.getToken()
+                val request = if (token != null) {
+                    chain.request().newBuilder()
+                        .addHeader("Authorization", "Bearer $token")
+                        .build()
+                } else {
+                    chain.request()
+                }
+                chain.proceed(request)
+            }
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
             .build()
 
@@ -38,4 +51,8 @@ object NetworkModule {
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
+
+    @Provides
+    @Singleton
+    fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
 }

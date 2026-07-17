@@ -12,8 +12,10 @@ retrofit = "3.0.0"
 kotlinxSerializationJson = "1.11.0"
 okhttp = "5.4.0"
 kotlinxCoroutines = "1.11.0"
+securityCrypto = "1.1.0"
 
 [libraries]
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

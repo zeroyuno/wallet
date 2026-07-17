@@ -58,3 +58,26 @@ cd backend && ./mvnw spring-boot:run
 
 Luego abrir `android/` en Android Studio y correr en un emulador (apunta a `http://10.0.2.2:8080`
 por defecto para el emulador de Android).
+
+### Configuración de JWT
+
+El backend firma los tokens con `app.security.jwt.secret` (ver
+[application.properties](backend/src/main/resources/application.properties)). El valor por defecto
+es solo para desarrollo local — en cualquier otro entorno, sobreescribirlo con la variable de entorno
+`JWT_SECRET` (mínimo 32 caracteres). La expiración se controla con `app.security.jwt.expiration`
+(por defecto `7d`).
+
+### Tests
+
+```bash
+cd backend && ./mvnw verify   # unitarios + ArchUnit + integración (Testcontainers) + cobertura 80%
+```
+
+Requiere Docker corriendo (Testcontainers levanta su propio Postgres, independiente del de
+`docker-compose.yml`).
+
+### Mejoras futuras (no bloqueantes)
+
+- Purga periódica de filas expiradas en `revoked_tokens` (`specs/001-user-auth/tasks.md`, T044) — hoy
+  esas filas simplemente dejan de ser relevantes (el JWT ya habría expirado de todas formas), pero
+  limpiarlas evitaría que la tabla crezca indefinidamente.
