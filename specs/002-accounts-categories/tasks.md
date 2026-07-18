@@ -26,7 +26,7 @@ orden hexagonal `domain → application → infrastructure`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Crear migración Flyway `backend/src/main/resources/db/migration/V2__create_accounts_and_categories.sql`
+- [x] T001 Crear migración Flyway `backend/src/main/resources/db/migration/V2__create_accounts_and_categories.sql`
       con las tablas `accounts` y `categories` (ver [data-model.md](data-model.md))
 
 ---
@@ -39,31 +39,31 @@ orden hexagonal `domain → application → infrastructure`.
 
 ### Domain (`account/domain`) — sin dependencias de Spring/JPA
 
-- [ ] T002 [P] Crear value objects `AccountId`, `CurrencyCode` y el enum `AccountType` en
+- [x] T002 [P] Crear value objects `AccountId`, `CurrencyCode` y el enum `AccountType` en
       `backend/src/main/java/com/walletapp/backend/account/domain/`
-- [ ] T003 [P] Crear agregado `Account` (factory `create`, método `rename`) en
+- [x] T003 [P] Crear agregado `Account` (factory `create`, método `rename`) en
       `account/domain/Account.java` (depende de T002)
-- [ ] T004 [P] Crear value object `CategoryId` y el enum `CategoryType` en `account/domain/`
-- [ ] T005 [P] Crear agregado `Category` (factory `create`, método `rename`) en
+- [x] T004 [P] Crear value object `CategoryId` y el enum `CategoryType` en `account/domain/`
+- [x] T005 [P] Crear agregado `Category` (factory `create`, método `rename`) en
       `account/domain/Category.java` (depende de T004)
-- [ ] T006 [P] Crear puertos de salida `AccountRepository`, `CategoryRepository` (interfaces) en
+- [x] T006 [P] Crear puertos de salida `AccountRepository`, `CategoryRepository` (interfaces) en
       `account/domain/` (depende de T003, T005)
-- [ ] T007 [P] Crear excepciones de dominio (`AccountNotFoundException`, `CategoryNotFoundException`,
+- [x] T007 [P] Crear excepciones de dominio (`AccountNotFoundException`, `CategoryNotFoundException`,
       `DuplicateCategoryException`, `InvalidCategoryHierarchyException`) en `account/domain/exception/`
-- [ ] T008 [ARQUITECTURA] Generalizar `backend/src/test/java/com/walletapp/backend/ArchitectureTest.java`
+- [x] T008 [ARQUITECTURA] Generalizar `backend/src/test/java/com/walletapp/backend/ArchitectureTest.java`
       para iterar sobre una lista de bounded contexts (`auth`, `account`) en vez de reglas hardcodeadas
       solo para `auth` (ver research.md)
 
 ### Application (`account/application`)
 
-- [ ] T009 [P] Crear DTOs (`AccountCommand`, `AccountView`, `CategoryCommand`, `CategoryView`) en
+- [x] T009 [P] Crear DTOs (`AccountCommand`, `AccountView`, `CategoryCommand`, `CategoryView`) en
       `account/application/dto/`
 
 ### Infrastructure — persistencia
 
-- [ ] T010 [P] Crear `AccountEntity` (JPA) y `SpringDataAccountRepository`/`JpaAccountRepository`
+- [x] T010 [P] Crear `AccountEntity` (JPA) y `SpringDataAccountRepository`/`JpaAccountRepository`
       (implementa el puerto de T006) en `account/infrastructure/persistence/` (depende de T003, T006)
-- [ ] T011 [P] Crear `CategoryEntity` (JPA) y `SpringDataCategoryRepository`/`JpaCategoryRepository`
+- [x] T011 [P] Crear `CategoryEntity` (JPA) y `SpringDataCategoryRepository`/`JpaCategoryRepository`
       (implementa el puerto de T006) en `account/infrastructure/persistence/` (depende de T005, T006)
 
 **Checkpoint**: dominio y persistencia de `account` listos — las historias de usuario pueden empezar.
@@ -79,25 +79,25 @@ orden hexagonal `domain → application → infrastructure`.
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Test unitario de `AccountService.create`/`list` (validación de nombre y saldo
+- [x] T012 [P] [US1] Test unitario de `AccountService.create`/`list` (validación de nombre y saldo
       numérico, FR-012; sin Spring ni DB) en
       `backend/src/test/java/com/walletapp/backend/account/application/AccountServiceTest.java`
-- [ ] T013 [P] [US1] Test de integración de `POST`/`GET /api/accounts` (incluyendo que un usuario
+- [x] T013 [P] [US1] Test de integración de `POST`/`GET /api/accounts` (incluyendo que un usuario
       nunca ve cuentas de otro) con Testcontainers en
       `backend/src/test/java/com/walletapp/backend/account/infrastructure/web/AccountControllerIT.java`
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implementar `AccountService.create()` y `.list()` en
+- [x] T014 [US1] Implementar `AccountService.create()` y `.list()` en
       `account/application/AccountService.java` (depende de T003, T006, T009)
-- [ ] T015 [US1] Implementar `POST`/`GET /api/accounts` en
+- [x] T015 [US1] Implementar `POST`/`GET /api/accounts` en
       `account/infrastructure/web/AccountController.java` + DTOs web (`AccountRequest`,
       `AccountResponse`) + `AccountExceptionHandler` (depende de T014)
-- [ ] T016 [P] [US1] Crear `AccountApi.kt` (Retrofit) y `AccountRepository.kt` en
+- [x] T016 [P] [US1] Crear `AccountApi.kt` (Retrofit) y `AccountRepository.kt` en
       `android/app/src/main/java/com/walletapp/android/accounts/`
-- [ ] T017 [P] [US1] Crear `AccountListScreen.kt` en
+- [x] T017 [P] [US1] Crear `AccountListScreen.kt` en
       `android/app/src/main/java/com/walletapp/android/accounts/ui/AccountListScreen.kt`
-- [ ] T018 [US1] Implementar `AccountViewModel` (listar y crear) en
+- [x] T018 [US1] Implementar `AccountViewModel` (listar y crear) en
       `android/app/src/main/java/com/walletapp/android/accounts/AccountViewModel.kt` (depende de T016)
 
 **Checkpoint**: User Story 1 funcional; verificar cobertura con `./mvnw verify` antes de seguir.
@@ -113,20 +113,20 @@ orden hexagonal `domain → application → infrastructure`.
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Test unitario de `AccountService.update`/`delete` (verifica que usan
+- [x] T019 [P] [US2] Test unitario de `AccountService.update`/`delete` (verifica que usan
       `findByIdAndUserId`) en `AccountServiceTest.java`
-- [ ] T020 [P] [US2] Test de integración de `PUT`/`DELETE /api/accounts/{id}` (éxito propio, 404 sobre
+- [x] T020 [P] [US2] Test de integración de `PUT`/`DELETE /api/accounts/{id}` (éxito propio, 404 sobre
       cuenta ajena — el caso más crítico de esta historia) en `AccountControllerIT.java`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Implementar `AccountService.update()` y `.delete()` en `AccountService.java`
+- [x] T021 [US2] Implementar `AccountService.update()` y `.delete()` en `AccountService.java`
       (depende de T014)
-- [ ] T022 [US2] Implementar `PUT`/`DELETE /api/accounts/{id}` en `AccountController.java` (depende de
+- [x] T022 [US2] Implementar `PUT`/`DELETE /api/accounts/{id}` en `AccountController.java` (depende de
       T021)
-- [ ] T023 [P] [US2] Crear `AccountFormScreen.kt` (editar) en
+- [x] T023 [P] [US2] Crear `AccountFormScreen.kt` (editar) en
       `android/app/src/main/java/com/walletapp/android/accounts/ui/AccountFormScreen.kt`
-- [ ] T024 [US2] Extender `AccountViewModel`/`AccountRepository` con editar y eliminar (depende de
+- [x] T024 [US2] Extender `AccountViewModel`/`AccountRepository` con editar y eliminar (depende de
       T016)
 
 **Checkpoint**: US1 y US2 de cuentas funcionan de forma independiente.
@@ -142,26 +142,26 @@ devuelve 409 (quickstart.md, escenario 4).
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] Test unitario de `CategoryService` (unicidad `userId+type+name`, FR-007; sin
+- [x] T025 [P] [US3] Test unitario de `CategoryService` (unicidad `userId+type+name`, FR-007; sin
       Spring ni DB) en
       `backend/src/test/java/com/walletapp/backend/account/application/CategoryServiceTest.java`
-- [ ] T026 [P] [US3] Test de integración de `POST`/`GET`/`PUT`/`DELETE /api/categories` (incluyendo
+- [x] T026 [P] [US3] Test de integración de `POST`/`GET`/`PUT`/`DELETE /api/categories` (incluyendo
       409 por duplicado y aislamiento entre usuarios) con Testcontainers en
       `backend/src/test/java/com/walletapp/backend/account/infrastructure/web/CategoryControllerIT.java`
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Implementar `CategoryService.create/list/update/delete()` (sin la validación de
+- [x] T027 [US3] Implementar `CategoryService.create/list/update/delete()` (sin la validación de
       jerarquía todavía, eso es US4) en `account/application/CategoryService.java` (depende de T005,
       T006, T009)
-- [ ] T028 [US3] Implementar `POST/GET/PUT/DELETE /api/categories` en
+- [x] T028 [US3] Implementar `POST/GET/PUT/DELETE /api/categories` en
       `account/infrastructure/web/CategoryController.java` + DTOs web (`CategoryRequest`,
       `CategoryResponse`) (depende de T027)
-- [ ] T029 [P] [US3] Crear `CategoryApi.kt` y `CategoryRepository.kt` en
+- [x] T029 [P] [US3] Crear `CategoryApi.kt` y `CategoryRepository.kt` en
       `android/app/src/main/java/com/walletapp/android/categories/`
-- [ ] T030 [P] [US3] Crear `CategoryListScreen.kt` y `CategoryFormScreen.kt` en
+- [x] T030 [P] [US3] Crear `CategoryListScreen.kt` y `CategoryFormScreen.kt` en
       `android/app/src/main/java/com/walletapp/android/categories/ui/`
-- [ ] T031 [US3] Implementar `CategoryViewModel` (CRUD) en
+- [x] T031 [US3] Implementar `CategoryViewModel` (CRUD) en
       `android/app/src/main/java/com/walletapp/android/categories/CategoryViewModel.kt` (depende de
       T029)
 
@@ -179,17 +179,17 @@ Edge Cases).
 
 ### Tests for User Story 4
 
-- [ ] T032 [P] [US4] Test unitario de la validación de ciclos/auto-referencia de
+- [x] T032 [P] [US4] Test unitario de la validación de ciclos/auto-referencia de
       `CategoryService.validateParent()` en `CategoryServiceTest.java`
-- [ ] T033 [P] [US4] Test de integración de creación/edición con `parentCategoryId` válido, inválido
+- [x] T033 [P] [US4] Test de integración de creación/edición con `parentCategoryId` válido, inválido
       (otro usuario/tipo) y cíclico en `CategoryControllerIT.java`
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] Añadir validación de `parentCategoryId` (mismo usuario, mismo tipo, sin ciclos —
+- [x] T034 [US4] Añadir validación de `parentCategoryId` (mismo usuario, mismo tipo, sin ciclos —
       recorre la cadena de padres vía `CategoryRepository`) en `CategoryService.create()`/`update()`
       (depende de T027; ver research.md)
-- [ ] T035 [P] [US4] Mostrar/seleccionar la categoría padre en `CategoryListScreen.kt`/
+- [x] T035 [P] [US4] Mostrar/seleccionar la categoría padre en `CategoryListScreen.kt`/
       `CategoryFormScreen.kt` (depende de T030)
 
 **Checkpoint**: las cuatro historias de usuario funcionan de forma independiente.
@@ -198,10 +198,10 @@ Edge Cases).
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T036 Ejecutar `./mvnw verify` y confirmar que `domain`/`application` de `account` superan el 80%
+- [x] T036 Ejecutar `./mvnw verify` y confirmar que `domain`/`application` de `account` superan el 80%
       de cobertura (constitución, principio III)
-- [ ] T037 [P] Documentar los nuevos endpoints en `README.md`
-- [ ] T038 Ejecutar [quickstart.md](quickstart.md) de punta a punta (incluyendo el escenario de
+- [x] T037 [P] Documentar los nuevos endpoints en `README.md`
+- [x] T038 Ejecutar [quickstart.md](quickstart.md) de punta a punta (incluyendo el escenario de
       aislamiento entre dos usuarios) contra la implementación real
 
 ---

@@ -42,6 +42,15 @@ diseño permite extraer un contexto a un microservicio real más adelante si el 
 sin reescribir el dominio. `domain` y `application` requieren >80% de cobertura (JaCoCo, verificado en
 `mvn verify`).
 
+## API
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
+- `GET/POST /api/accounts`, `PUT/DELETE /api/accounts/{id}`
+- `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` (soporta `parentCategoryId` opcional
+  para subcategorías; no se puede eliminar una categoría que todavía tiene subcategorías — `409`)
+
+Contratos completos (OpenAPI) en `specs/<feature>/contracts/`.
+
 ## Stack
 
 **Backend**: Java 25, Spring Boot 4.1.0, Spring Data JPA, Spring Security (JWT), PostgreSQL, Flyway,
@@ -81,3 +90,7 @@ Requiere Docker corriendo (Testcontainers levanta su propio Postgres, independie
 - Purga periódica de filas expiradas en `revoked_tokens` (`specs/001-user-auth/tasks.md`, T044) — hoy
   esas filas simplemente dejan de ser relevantes (el JWT ya habría expirado de todas formas), pero
   limpiarlas evitaría que la tabla crezca indefinidamente.
+- La app Android no verifica si ya hay un token válido guardado al iniciar — siempre muestra Login,
+  aunque `TokenStore` persista la sesión entre instalaciones/reinicios de la app.
+- `AccountListScreen`/`CategoryListScreen` no tienen forma de volver a Home dentro de la app (el botón
+  atrás del sistema cierra la Activity en vez de navegar); falta un `NavHost` real con back stack.
