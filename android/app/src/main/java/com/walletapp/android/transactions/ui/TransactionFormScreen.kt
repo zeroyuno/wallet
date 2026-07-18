@@ -113,7 +113,7 @@ fun TransactionFormScreen(
             onValueChange = { amount = it },
             label = { Text("Monto") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
 
