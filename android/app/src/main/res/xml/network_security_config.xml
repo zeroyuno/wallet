@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- 10.0.2.2 es la loopback del host visible solo desde el emulador de Android (NetworkModule.kt).
-         Nunca resuelve a nada fuera de un emulador local, así que habilitar cleartext solo para
-         este dominio no debilita la seguridad de la app en dispositivos/producción reales. -->
+    <!-- Direcciones de solo desarrollo local (backend HTTP sin TLS). Ninguna de las dos resuelve a
+         nada en producción, así que habilitar cleartext acá no debilita la app en dispositivos reales
+         fuera de esta red de desarrollo. -->
     <domain-config cleartextTrafficPermitted="true">
+        <!-- Loopback del host visible solo desde el emulador de Android (ver NetworkModule.kt). -->
         <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- IP de la Mac en la WiFi local, para probar desde un dispositivo físico en la misma red. -->
+        <domain includeSubdomains="false">192.168.68.111</domain>
     </domain-config>
 </network-security-config>

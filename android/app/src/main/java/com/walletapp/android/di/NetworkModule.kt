@@ -14,8 +14,11 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import javax.inject.Singleton
 
-// 10.0.2.2 es la loopback del host desde el emulador de Android hacia el backend local.
-private const val BASE_URL = "http://10.0.2.2:8080/"
+// IP local de la Mac en la red WiFi (backend corriendo ahí en :8080). Se prueba en un dispositivo
+// físico en la misma red — el emulador de Android en esta máquina no logra conectar apps normales
+// (UID no privilegiado) a 10.0.2.2 pese a que curl/Chrome/shell sí pueden, algo específico de este
+// entorno. Si volvés a usar el emulador, cambiar por "http://10.0.2.2:8080/".
+private const val BASE_URL = "http://192.168.68.111:8080/"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -29,6 +32,10 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(tokenStore: TokenStore): OkHttpClient =
         OkHttpClient.Builder()
+            // Modo de conexión secuencial clásico en vez del "fast fallback" (Happy Eyeballs) de
+            // OkHttp 5 — no era la causa del problema de conectividad del emulador, pero es un modo
+            // más simple/predecible de todas formas para esta app.
+            .fastFallback(false)
             .addInterceptor { chain ->
                 val token = tokenStore.getToken()
                 val request = if (token != null) {
