@@ -2,6 +2,7 @@ package com.walletapp.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +65,19 @@ private sealed interface Screen {
 @Composable
 private fun WalletApp() {
     var screen by remember { mutableStateOf<Screen>(Screen.Login) }
+
+    // Login y Home no tienen "atrás" dentro de la app — ahí el botón atrás del sistema
+    // hace lo de siempre (fondo/salir). El resto de las pantallas sí tienen un padre lógico.
+    BackHandler(enabled = screen != Screen.Login && screen != Screen.Home) {
+        screen = when (val current = screen) {
+            Screen.Login, Screen.Home -> screen
+            Screen.Register -> Screen.Login
+            Screen.AccountsList -> Screen.Home
+            is Screen.AccountForm -> Screen.AccountsList
+            Screen.CategoriesList -> Screen.Home
+            is Screen.CategoryForm -> Screen.CategoriesList
+        }
+    }
 
     when (val current = screen) {
         Screen.Login -> LoginScreen(
