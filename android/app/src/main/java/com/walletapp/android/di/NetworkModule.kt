@@ -1,6 +1,8 @@
 package com.walletapp.android.di
 
+import com.walletapp.android.accounts.AccountApi
 import com.walletapp.android.auth.AuthApi
+import com.walletapp.android.categories.CategoryApi
 import com.walletapp.android.data.TokenStore
 import dagger.Module
 import dagger.Provides
@@ -62,4 +64,12 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAccountApi(retrofit: Retrofit): AccountApi = retrofit.create(AccountApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCategoryApi(retrofit: Retrofit): CategoryApi = retrofit.create(CategoryApi::class.java)
 }

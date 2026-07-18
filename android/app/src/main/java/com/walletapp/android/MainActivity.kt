@@ -7,9 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,9 +23,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.walletapp.android.accounts.AccountResponse
+import com.walletapp.android.accounts.ui.AccountFormScreen
+import com.walletapp.android.accounts.ui.AccountListScreen
 import com.walletapp.android.auth.AuthViewModel
 import com.walletapp.android.auth.ui.LoginScreen
 import com.walletapp.android.auth.ui.RegisterScreen
+import com.walletapp.android.categories.CategoryResponse
+import com.walletapp.android.categories.ui.CategoryFormScreen
+import com.walletapp.android.categories.ui.CategoryListScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -43,35 +51,82 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { LOGIN, REGISTER, HOME }
+private sealed interface Screen {
+    data object Login : Screen
+    data object Register : Screen
+    data object Home : Screen
+    data object AccountsList : Screen
+    data class AccountForm(val account: AccountResponse? = null) : Screen
+    data object CategoriesList : Screen
+    data class CategoryForm(val category: CategoryResponse? = null) : Screen
+}
 
 @Composable
 private fun WalletApp() {
-    var screen by remember { mutableStateOf(Screen.LOGIN) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Login) }
 
-    when (screen) {
-        Screen.LOGIN -> LoginScreen(
-            onLoggedIn = { screen = Screen.HOME },
-            onNavigateToRegister = { screen = Screen.REGISTER }
+    when (val current = screen) {
+        Screen.Login -> LoginScreen(
+            onLoggedIn = { screen = Screen.Home },
+            onNavigateToRegister = { screen = Screen.Register }
         )
-        Screen.REGISTER -> RegisterScreen(
-            onRegistered = { screen = Screen.LOGIN }
+        Screen.Register -> RegisterScreen(
+            onRegistered = { screen = Screen.Login }
         )
-        Screen.HOME -> HomeScreen(onLoggedOut = { screen = Screen.LOGIN })
+        Screen.Home -> HomeScreen(
+            onLoggedOut = { screen = Screen.Login },
+            onOpenAccounts = { screen = Screen.AccountsList },
+            onOpenCategories = { screen = Screen.CategoriesList }
+        )
+        Screen.AccountsList -> AccountListScreen(
+            onAddAccount = { screen = Screen.AccountForm() },
+            onEditAccount = { screen = Screen.AccountForm(it) }
+        )
+        is Screen.AccountForm -> AccountFormScreen(
+            existingAccount = current.account,
+            onSaved = { screen = Screen.AccountsList },
+            onDeleted = { screen = Screen.AccountsList },
+            onCancel = { screen = Screen.AccountsList }
+        )
+        Screen.CategoriesList -> CategoryListScreen(
+            onAddCategory = { screen = Screen.CategoryForm() },
+            onEditCategory = { screen = Screen.CategoryForm(it) }
+        )
+        is Screen.CategoryForm -> CategoryFormScreen(
+            existingCategory = current.category,
+            onSaved = { screen = Screen.CategoriesList },
+            onDeleted = { screen = Screen.CategoriesList },
+            onCancel = { screen = Screen.CategoriesList }
+        )
     }
 }
 
 @Composable
-private fun HomeScreen(onLoggedOut: () -> Unit, viewModel: AuthViewModel = hiltViewModel()) {
+private fun HomeScreen(
+    onLoggedOut: () -> Unit,
+    onOpenAccounts: () -> Unit,
+    onOpenCategories: () -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(text = "Wallet — sesión iniciada", style = MaterialTheme.typography.headlineSmall)
-        Button(onClick = {
-            viewModel.logout()
-            onLoggedOut()
-        }) {
+        Text(text = "Wallet", style = MaterialTheme.typography.headlineSmall)
+
+        Button(onClick = onOpenAccounts, modifier = Modifier.fillMaxWidth()) {
+            Text("Mis cuentas")
+        }
+        Button(onClick = onOpenCategories, modifier = Modifier.fillMaxWidth()) {
+            Text("Mis categorías")
+        }
+        OutlinedButton(
+            onClick = {
+                viewModel.logout()
+                onLoggedOut()
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text("Cerrar sesión")
         }
     }
