@@ -92,5 +92,3 @@ Requiere Docker corriendo (Testcontainers levanta su propio Postgres, independie
   limpiarlas evitaría que la tabla crezca indefinidamente.
 - La app Android no verifica si ya hay un token válido guardado al iniciar — siempre muestra Login,
   aunque `TokenStore` persista la sesión entre instalaciones/reinicios de la app.
-- `AccountListScreen`/`CategoryListScreen` no tienen forma de volver a Home dentro de la app (el botón
-  atrás del sistema cierra la Activity en vez de navegar); falta un `NavHost` real con back stack.
