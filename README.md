@@ -90,5 +90,3 @@ Requiere Docker corriendo (Testcontainers levanta su propio Postgres, independie
 - Purga periódica de filas expiradas en `revoked_tokens` (`specs/001-user-auth/tasks.md`, T044) — hoy
   esas filas simplemente dejan de ser relevantes (el JWT ya habría expirado de todas formas), pero
   limpiarlas evitaría que la tabla crezca indefinidamente.
-- La app Android no verifica si ya hay un token válido guardado al iniciar — siempre muestra Login,
-  aunque `TokenStore` persista la sesión entre instalaciones/reinicios de la app.

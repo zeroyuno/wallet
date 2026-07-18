@@ -31,6 +31,20 @@ class AuthRepository @Inject constructor(
             .onFailure { Log.e(TAG, "login: falló para email=$email", it) }
     }
 
+    fun hasStoredToken(): Boolean = tokenStore.getToken() != null
+
+    // Confirma contra el backend que el token guardado todavía es válido (no expiró, no fue
+    // revocado desde otro dispositivo/logout). Si no lo es, limpia el token local.
+    suspend fun validateSession(): Result<UserResponse> {
+        Log.d(TAG, "validateSession: GET /api/auth/me")
+        return runCatching { authApi.me() }
+            .onSuccess { Log.d(TAG, "validateSession: OK, sesión sigue activa") }
+            .onFailure {
+                Log.w(TAG, "validateSession: token inválido o expirado, se limpia", it)
+                tokenStore.clearToken()
+            }
+    }
+
     suspend fun logout(): Result<Unit> {
         Log.d(TAG, "logout: POST /api/auth/logout")
         return runCatching { authApi.logout() }
