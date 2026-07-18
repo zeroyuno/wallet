@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Wallet Accounts & Categories API
+  version: "1.0.0"
+  description: Contrato de la feature 002 (Gestión de cuentas y categorías). Todos los endpoints
+    requieren autenticación (JWT de la feature 001) y operan exclusivamente sobre los datos del
+    usuario autenticado.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/accounts:
+    get:
+      summary: Listar las cuentas del usuario autenticado (FR-002)
+      responses:
+        "200":
+          description: Lista de cuentas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountResponse"
+    post:
+      summary: Crear una cuenta (FR-001, FR-012)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRequest"
+      responses:
+        "201":
+          description: Cuenta creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+        "400":
+          description: Datos inválidos (nombre vacío, saldo no numérico)
+
+  /api/accounts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Editar una cuenta propia (FR-003)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountRequest"
+      responses:
+        "200":
+          description: Cuenta actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+        "404":
+          description: Cuenta no encontrada o no pertenece al usuario autenticado (FR-005)
+    delete:
+      summary: Eliminar una cuenta propia (FR-004)
+      responses:
+        "204":
+          description: Cuenta eliminada
+        "404":
+          description: Cuenta no encontrada o no pertenece al usuario autenticado (FR-005)
+
+  /api/categories:
+    get:
+      summary: Listar las categorías del usuario autenticado (FR-008)
+      responses:
+        "200":
+          description: Lista de categorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryResponse"
+    post:
+      summary: Crear una categoría (FR-006, FR-007, FR-010, FR-011)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryRequest"
+      responses:
+        "201":
+          description: Categoría creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "400":
+          description: Datos inválidos, ciclo de subcategoría, o padre de otro tipo
+        "409":
+          description: Ya existe una categoría con ese nombre y tipo para este usuario
+
+  /api/categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Editar una categoría propia (FR-009)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryRequest"
+      responses:
+        "200":
+          description: Categoría actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "404":
+          description: Categoría no encontrada o no pertenece al usuario autenticado
+    delete:
+      summary: Eliminar una categoría propia (FR-009)
+      responses:
+        "204":
+          description: Categoría eliminada
+        "404":
+          description: Categoría no encontrada o no pertenece al usuario autenticado
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AccountRequest:
+      type: object
+      required: [name, type, currency, initialBalance]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [CASH, BANK, CREDIT_CARD, OTHER]
+        currency:
+          type: string
+          example: USD
+        initialBalance:
+          type: number
+    AccountResponse:
+      allOf:
+        - $ref: "#/components/schemas/AccountRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+    CategoryRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        parentCategoryId:
+          type: string
+          format: uuid
+          nullable: true
+    CategoryResponse:
+      allOf:
+        - $ref: "#/components/schemas/CategoryRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
