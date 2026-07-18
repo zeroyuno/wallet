@@ -70,12 +70,15 @@ class AuthViewModel @Inject constructor(
     }
 
     fun logout() {
-        Log.d(TAG, "logout() -> iniciando")
+        Log.d(TAG, "logout() -> estado reseteado, revocando token en el servidor en background")
+        // Reset inmediato: la pantalla de Login comparte este ViewModel y no debe seguir viendo
+        // Success de la sesión anterior al navegar de vuelta (eso causaba que el primer click no
+        // pareciera hacer nada — recién con el segundo, cuando la llamada de red ya había terminado).
+        _loginState.value = LoginUiState.Idle
+        _registerState.value = RegisterUiState.Idle
         viewModelScope.launch {
             authRepository.logout()
-            Log.d(TAG, "logout() -> estado reseteado")
-            _loginState.value = LoginUiState.Idle
-            _registerState.value = RegisterUiState.Idle
+            Log.d(TAG, "logout() -> token revocado en el servidor")
         }
     }
 }
