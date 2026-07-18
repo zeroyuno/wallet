@@ -1,11 +1,13 @@
 package com.walletapp.android.accounts.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -27,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.AccountType
 import com.walletapp.android.accounts.AccountViewModel
+import com.walletapp.android.accounts.displayLabel
 
 @Composable
 fun AccountFormScreen(
@@ -61,12 +64,15 @@ fun AccountFormScreen(
         )
 
         Text(text = "Tipo", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        ) {
             AccountType.entries.forEach { option ->
                 FilterChip(
                     selected = type == option,
                     onClick = { type = option },
-                    label = { Text(option.name) }
+                    label = { Text(option.displayLabel()) }
                 )
             }
         }

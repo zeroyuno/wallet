@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.walletapp.android.categories.CategoriesUiState
 import com.walletapp.android.categories.CategoryResponse
 import com.walletapp.android.categories.CategoryViewModel
+import com.walletapp.android.categories.displayLabel
 
 @Composable
 fun CategoryListScreen(
@@ -90,7 +91,7 @@ private fun CategoryRow(category: CategoryResponse, parentName: String?, onClick
                     )
                 }
             }
-            Text(text = category.type.name, style = MaterialTheme.typography.bodyMedium)
+            Text(text = category.type.displayLabel(), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

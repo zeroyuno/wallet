@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.AccountViewModel
 import com.walletapp.android.accounts.AccountsUiState
+import com.walletapp.android.accounts.displayLabel
 
 @Composable
 fun AccountListScreen(
@@ -78,7 +79,7 @@ private fun AccountRow(account: AccountResponse, onClick: () -> Unit) {
             Column {
                 Text(text = account.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = account.type.name,
+                    text = account.type.displayLabel(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
