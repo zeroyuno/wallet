@@ -7,6 +7,6 @@
         <!-- Loopback del host visible solo desde el emulador de Android (ver NetworkModule.kt). -->
         <domain includeSubdomains="false">10.0.2.2</domain>
         <!-- IP de la Mac en la WiFi local, para probar desde un dispositivo físico en la misma red. -->
-        <domain includeSubdomains="false">192.168.68.111</domain>
+        <domain includeSubdomains="false">192.168.68.113</domain>
     </domain-config>
 </network-security-config>

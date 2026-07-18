@@ -20,7 +20,7 @@ import javax.inject.Singleton
 // físico en la misma red — el emulador de Android en esta máquina no logra conectar apps normales
 // (UID no privilegiado) a 10.0.2.2 pese a que curl/Chrome/shell sí pueden, algo específico de este
 // entorno. Si volvés a usar el emulador, cambiar por "http://10.0.2.2:8080/".
-private const val BASE_URL = "http://192.168.68.111:8080/"
+private const val BASE_URL = "http://192.168.68.113:8080/"
 
 @Module
 @InstallIn(SingletonComponent::class)
