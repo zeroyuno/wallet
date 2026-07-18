@@ -11,6 +11,11 @@ import retrofit2.http.Path
 @Serializable
 enum class CategoryType { INCOME, EXPENSE }
 
+fun CategoryType.displayLabel(): String = when (this) {
+    CategoryType.INCOME -> "Ingreso"
+    CategoryType.EXPENSE -> "Gasto"
+}
+
 @Serializable
 data class CategoryRequest(val name: String, val type: CategoryType, val parentCategoryId: String? = null)
 

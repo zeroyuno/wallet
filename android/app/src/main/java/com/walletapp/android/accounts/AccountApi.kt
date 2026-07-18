@@ -11,6 +11,13 @@ import retrofit2.http.Path
 @Serializable
 enum class AccountType { CASH, BANK, CREDIT_CARD, OTHER }
 
+fun AccountType.displayLabel(): String = when (this) {
+    AccountType.CASH -> "Efectivo"
+    AccountType.BANK -> "Banco"
+    AccountType.CREDIT_CARD -> "Tarjeta de crédito"
+    AccountType.OTHER -> "Otro"
+}
+
 @Serializable
 data class AccountRequest(
     val name: String,

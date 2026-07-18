@@ -1,5 +1,6 @@
 package com.walletapp.android.categories.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,7 @@ import com.walletapp.android.categories.CategoriesUiState
 import com.walletapp.android.categories.CategoryResponse
 import com.walletapp.android.categories.CategoryType
 import com.walletapp.android.categories.CategoryViewModel
+import com.walletapp.android.categories.displayLabel
 
 @Composable
 fun CategoryFormScreen(
@@ -74,12 +77,15 @@ fun CategoryFormScreen(
         )
 
         Text(text = "Tipo", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        ) {
             CategoryType.entries.forEach { option ->
                 FilterChip(
                     selected = type == option,
                     onClick = { type = option },
-                    label = { Text(if (option == CategoryType.INCOME) "Ingreso" else "Gasto") }
+                    label = { Text(option.displayLabel()) }
                 )
             }
         }
