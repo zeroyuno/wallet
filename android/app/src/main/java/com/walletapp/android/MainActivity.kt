@@ -11,7 +11,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.walletapp.android.auth.ui.LoginScreen
+import com.walletapp.android.auth.ui.RegisterScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -23,7 +29,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Scaffold { innerPadding ->
                     Surface(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                        PlaceholderScreen()
+                        WalletApp()
                     }
                 }
             }
@@ -31,7 +37,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class Screen { LOGIN, REGISTER, HOME }
+
 @Composable
-fun PlaceholderScreen() {
-    Text(text = "Wallet")
+private fun WalletApp() {
+    var screen by remember { mutableStateOf(Screen.LOGIN) }
+
+    when (screen) {
+        Screen.LOGIN -> LoginScreen(
+            onLoggedIn = { screen = Screen.HOME },
+            onNavigateToRegister = { screen = Screen.REGISTER }
+        )
+        Screen.REGISTER -> RegisterScreen(
+            onRegistered = { screen = Screen.LOGIN }
+        )
+        Screen.HOME -> Text(text = "Wallet — sesión iniciada")
+    }
 }
