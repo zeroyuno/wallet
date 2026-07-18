@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.AccountViewModel
+import com.walletapp.android.accounts.AccountWithBalance
 import com.walletapp.android.accounts.AccountsUiState
 import com.walletapp.android.accounts.displayLabel
 
@@ -38,6 +40,12 @@ fun AccountListScreen(
     viewModel: AccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // El saldo puede quedar desactualizado si se registró/editó/eliminó un movimiento desde la
+    // pantalla de transacciones — esa pantalla usa su propia instancia de TransactionViewModel y no
+    // tiene forma de avisarle a este AccountViewModel (que Compose retiene entre navegaciones) que
+    // debe refrescar. Se refresca cada vez que se vuelve a entrar a esta pantalla en su lugar.
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
     Scaffold(
         floatingActionButton = {
@@ -58,8 +66,8 @@ fun AccountListScreen(
                         Text(text = "Todavía no tenés cuentas. Tocá + para crear la primera.")
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(current.accounts, key = { it.id }) { account ->
-                                AccountRow(account = account, onClick = { onEditAccount(account) })
+                            items(current.accounts, key = { it.account.id }) { entry ->
+                                AccountRow(entry = entry, onClick = { onEditAccount(entry.account) })
                             }
                         }
                     }
@@ -70,7 +78,8 @@ fun AccountListScreen(
 }
 
 @Composable
-private fun AccountRow(account: AccountResponse, onClick: () -> Unit) {
+private fun AccountRow(entry: AccountWithBalance, onClick: () -> Unit) {
+    val account = entry.account
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -84,7 +93,7 @@ private fun AccountRow(account: AccountResponse, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(text = "${account.initialBalance} ${account.currency}", style = MaterialTheme.typography.titleMedium)
+            Text(text = "${entry.balance} ${account.currency}", style = MaterialTheme.typography.titleMedium)
         }
     }
 }
