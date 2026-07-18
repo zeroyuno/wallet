@@ -39,6 +39,9 @@ import com.walletapp.android.auth.ui.RegisterScreen
 import com.walletapp.android.categories.CategoryResponse
 import com.walletapp.android.categories.ui.CategoryFormScreen
 import com.walletapp.android.categories.ui.CategoryListScreen
+import com.walletapp.android.transactions.TransactionResponse
+import com.walletapp.android.transactions.ui.TransactionFormScreen
+import com.walletapp.android.transactions.ui.TransactionListScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -66,6 +69,8 @@ private sealed interface Screen {
     data class AccountForm(val account: AccountResponse? = null) : Screen
     data object CategoriesList : Screen
     data class CategoryForm(val category: CategoryResponse? = null) : Screen
+    data object TransactionsList : Screen
+    data class TransactionForm(val transaction: TransactionResponse? = null) : Screen
 }
 
 @Composable
@@ -93,6 +98,8 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
             is Screen.AccountForm -> Screen.AccountsList
             Screen.CategoriesList -> Screen.Home
             is Screen.CategoryForm -> Screen.CategoriesList
+            Screen.TransactionsList -> Screen.Home
+            is Screen.TransactionForm -> Screen.TransactionsList
         }
     }
 
@@ -114,7 +121,8 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
         Screen.Home -> HomeScreen(
             onLoggedOut = { screen = Screen.Login },
             onOpenAccounts = { screen = Screen.AccountsList },
-            onOpenCategories = { screen = Screen.CategoriesList }
+            onOpenCategories = { screen = Screen.CategoriesList },
+            onOpenTransactions = { screen = Screen.TransactionsList }
         )
         Screen.AccountsList -> AccountListScreen(
             onAddAccount = { screen = Screen.AccountForm() },
@@ -136,6 +144,17 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
             onDeleted = { screen = Screen.CategoriesList },
             onCancel = { screen = Screen.CategoriesList }
         )
+        Screen.TransactionsList -> TransactionListScreen(
+            onAddTransaction = { screen = Screen.TransactionForm() },
+            onEditTransaction = { screen = Screen.TransactionForm(it) }
+        )
+        is Screen.TransactionForm -> TransactionFormScreen(
+            existingTransaction = current.transaction,
+            onSaved = { screen = Screen.TransactionsList },
+            onDeleted = { screen = Screen.TransactionsList },
+            onCancel = { screen = Screen.TransactionsList },
+            onNavigateToCreateAccount = { screen = Screen.AccountForm() }
+        )
     }
 }
 
@@ -144,6 +163,7 @@ private fun HomeScreen(
     onLoggedOut: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenCategories: () -> Unit,
+    onOpenTransactions: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     Column(
@@ -152,6 +172,9 @@ private fun HomeScreen(
     ) {
         Text(text = "Wallet", style = MaterialTheme.typography.headlineSmall)
 
+        Button(onClick = onOpenTransactions, modifier = Modifier.fillMaxWidth()) {
+            Text("Mis movimientos")
+        }
         Button(onClick = onOpenAccounts, modifier = Modifier.fillMaxWidth()) {
             Text("Mis cuentas")
         }

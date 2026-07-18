@@ -3,7 +3,11 @@ package com.walletapp.android.accounts
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.walletapp.android.transactions.BalanceResponse
+import com.walletapp.android.transactions.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,15 +16,18 @@ import javax.inject.Inject
 
 private const val TAG = "AccountViewModel"
 
+data class AccountWithBalance(val account: AccountResponse, val balance: Double)
+
 sealed interface AccountsUiState {
     data object Loading : AccountsUiState
-    data class Success(val accounts: List<AccountResponse>) : AccountsUiState
+    data class Success(val accounts: List<AccountWithBalance>) : AccountsUiState
     data class Error(val message: String) : AccountsUiState
 }
 
 @HiltViewModel
 class AccountViewModel @Inject constructor(
-    private val accountRepository: AccountRepository
+    private val accountRepository: AccountRepository,
+    private val transactionRepository: TransactionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)
@@ -35,9 +42,17 @@ class AccountViewModel @Inject constructor(
         _uiState.value = AccountsUiState.Loading
         viewModelScope.launch {
             accountRepository.list()
-                .onSuccess {
-                    Log.d(TAG, "refresh() -> Success (${it.size} cuentas)")
-                    _uiState.value = AccountsUiState.Success(it)
+                .onSuccess { accounts ->
+                    Log.d(TAG, "refresh() -> Success (${accounts.size} cuentas), resolviendo saldos")
+                    val withBalances = accounts.map { account ->
+                        async {
+                            val balance = transactionRepository.getBalance(account.id)
+                                .getOrDefault(BalanceResponse(account.id, account.initialBalance))
+                                .balance
+                            AccountWithBalance(account, balance)
+                        }
+                    }.awaitAll()
+                    _uiState.value = AccountsUiState.Success(withBalances)
                 }
                 .onFailure {
                     Log.e(TAG, "refresh() -> Error: ${it.message}")
