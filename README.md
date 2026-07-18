@@ -48,6 +48,14 @@ sin reescribir el dominio. `domain` y `application` requieren >80% de cobertura 
 - `GET/POST /api/accounts`, `PUT/DELETE /api/accounts/{id}`
 - `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` (soporta `parentCategoryId` opcional
   para subcategorías; no se puede eliminar una categoría que todavía tiene subcategorías — `409`)
+- `GET/POST /api/transactions` (filtros opcionales por query params `accountId`, `categoryId`,
+  `dateFrom`, `dateTo`), `PUT/DELETE /api/transactions/{id}` (solo `amount`/`date`/`categoryId`/
+  `description` son editables — `type` y `accountId` son inmutables tras la creación).
+  `POST /api/transactions` acepta un `id` opcional (UUID v7) provisto por el cliente, pensado para
+  una futura creación offline — un `id` duplicado responde `409`. No se puede eliminar una cuenta o
+  categoría que todavía tiene transacciones asociadas — `409`.
+- `GET /api/accounts/{id}/balance` — saldo actual (saldo inicial + transacciones), implementado en el
+  contexto `transaction`, no en `account` (ver `specs/003-transactions/research.md`).
 
 Contratos completos (OpenAPI) en `specs/<feature>/contracts/`.
 

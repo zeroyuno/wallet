@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -56,6 +57,14 @@ public class CategoryService {
                     "Cannot delete a category that has subcategories: " + id.value());
         }
         categoryRepository.deleteByIdAndUserId(id, userId);
+    }
+
+    // Método de solo lectura para otros bounded contexts (ej. transaction) — devuelve el tipo como
+    // String, nunca CategoryType, para no arrastrar una dependencia de dominio a través de la
+    // frontera del contexto (ver research.md de la feature 003).
+    public Optional<String> findTypeIfOwnedByUser(UUID userId, UUID categoryId) {
+        return categoryRepository.findByIdAndUserId(CategoryId.of(categoryId), userId)
+                .map(category -> category.type().name());
     }
 
     private Category findOwned(UUID userId, CategoryId id) {

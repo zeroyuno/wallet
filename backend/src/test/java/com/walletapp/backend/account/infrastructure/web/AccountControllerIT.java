@@ -122,4 +122,27 @@ class AccountControllerIT {
     void rejectsAccountWithoutToken() throws Exception {
         mockMvc.perform(get("/api/accounts")).andExpect(status().isUnauthorized());
     }
+
+    // FR-010 (feature 003): no se puede eliminar una cuenta con transacciones asociadas — 409, no
+    // el 401 que se filtraba antes de corregir el manejo de DataIntegrityViolationException (ver
+    // AccountExceptionHandler y research.md de la feature 003).
+    @Test
+    void rejectsDeletingAccountThatHasTransactions() throws Exception {
+        String token = registerAndLogin("acc-delete-with-tx@example.com");
+
+        String createResponse = mockMvc.perform(post("/api/accounts").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Efectivo\",\"type\":\"CASH\",\"currency\":\"USD\",\"initialBalance\":100}"))
+                .andReturn().getResponse().getContentAsString();
+        String accountId = com.jayway.jsonpath.JsonPath.read(createResponse, "$.id");
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":10,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/api/accounts/" + accountId).header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+    }
 }
