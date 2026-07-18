@@ -1,6 +1,7 @@
 package com.walletapp.backend.account.infrastructure.web;
 
 import com.walletapp.backend.account.domain.exception.AccountNotFoundException;
+import com.walletapp.backend.account.domain.exception.CategoryHasChildrenException;
 import com.walletapp.backend.account.domain.exception.CategoryNotFoundException;
 import com.walletapp.backend.account.domain.exception.DuplicateCategoryException;
 import com.walletapp.backend.account.domain.exception.InvalidCategoryHierarchyException;
@@ -28,6 +29,12 @@ class AccountExceptionHandler {
 
     @ExceptionHandler(DuplicateCategoryException.class)
     ResponseEntity<Map<String, String>> handleDuplicateCategory(DuplicateCategoryException ex) {
+        log.warn("409 {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CategoryHasChildrenException.class)
+    ResponseEntity<Map<String, String>> handleCategoryHasChildren(CategoryHasChildrenException ex) {
         log.warn("409 {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
     }

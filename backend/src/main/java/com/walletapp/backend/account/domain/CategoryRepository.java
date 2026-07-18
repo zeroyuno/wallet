@@ -15,4 +15,6 @@ public interface CategoryRepository {
     void deleteByIdAndUserId(CategoryId id, UUID userId);
 
     boolean existsByUserIdAndTypeAndName(UUID userId, CategoryType type, String name);
+
+    boolean existsByParentCategoryIdAndUserId(CategoryId parentCategoryId, UUID userId);
 }

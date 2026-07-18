@@ -6,6 +6,7 @@ import com.walletapp.backend.account.domain.Category;
 import com.walletapp.backend.account.domain.CategoryId;
 import com.walletapp.backend.account.domain.CategoryRepository;
 import com.walletapp.backend.account.domain.CategoryType;
+import com.walletapp.backend.account.domain.exception.CategoryHasChildrenException;
 import com.walletapp.backend.account.domain.exception.CategoryNotFoundException;
 import com.walletapp.backend.account.domain.exception.DuplicateCategoryException;
 import com.walletapp.backend.account.domain.exception.InvalidCategoryHierarchyException;
@@ -50,6 +51,10 @@ public class CategoryService {
 
     public void delete(UUID userId, CategoryId id) {
         findOwned(userId, id);
+        if (categoryRepository.existsByParentCategoryIdAndUserId(id, userId)) {
+            throw new CategoryHasChildrenException(
+                    "Cannot delete a category that has subcategories: " + id.value());
+        }
         categoryRepository.deleteByIdAndUserId(id, userId);
     }
 

@@ -128,6 +128,25 @@ class CategoryControllerIT {
     }
 
     @Test
+    void rejectsDeletingCategoryThatStillHasChildren() throws Exception {
+        String token = registerAndLogin("cat-delete-parent@example.com");
+
+        String parentResponse = mockMvc.perform(post("/api/categories").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Comida\",\"type\":\"EXPENSE\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String parentId = com.jayway.jsonpath.JsonPath.read(parentResponse, "$.id");
+
+        mockMvc.perform(post("/api/categories").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Supermercado\",\"type\":\"EXPENSE\",\"parentCategoryId\":\"" + parentId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/api/categories/" + parentId).header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void rejectsCategoryWithoutToken() throws Exception {
         mockMvc.perform(get("/api/categories")).andExpect(status().isUnauthorized());
     }

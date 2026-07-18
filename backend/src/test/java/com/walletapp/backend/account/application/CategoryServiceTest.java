@@ -6,6 +6,7 @@ import com.walletapp.backend.account.domain.Category;
 import com.walletapp.backend.account.domain.CategoryId;
 import com.walletapp.backend.account.domain.CategoryRepository;
 import com.walletapp.backend.account.domain.CategoryType;
+import com.walletapp.backend.account.domain.exception.CategoryHasChildrenException;
 import com.walletapp.backend.account.domain.exception.CategoryNotFoundException;
 import com.walletapp.backend.account.domain.exception.DuplicateCategoryException;
 import com.walletapp.backend.account.domain.exception.InvalidCategoryHierarchyException;
@@ -87,6 +88,18 @@ class CategoryServiceTest {
         service.delete(userId, category.id());
 
         verify(categoryRepository).deleteByIdAndUserId(category.id(), userId);
+    }
+
+    @Test
+    void deleteRejectsCategoryThatStillHasChildren() {
+        Category category = Category.create(userId, "Comida", CategoryType.EXPENSE, null);
+        when(categoryRepository.findByIdAndUserId(category.id(), userId)).thenReturn(Optional.of(category));
+        when(categoryRepository.existsByParentCategoryIdAndUserId(category.id(), userId)).thenReturn(true);
+
+        CategoryService service = new CategoryService(categoryRepository);
+
+        assertThatThrownBy(() -> service.delete(userId, category.id()))
+                .isInstanceOf(CategoryHasChildrenException.class);
     }
 
     @Test

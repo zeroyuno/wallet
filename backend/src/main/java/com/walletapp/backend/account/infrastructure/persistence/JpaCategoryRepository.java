@@ -45,6 +45,11 @@ class JpaCategoryRepository implements CategoryRepository {
         return springDataRepository.existsByUserIdAndTypeAndName(userId, type, name);
     }
 
+    @Override
+    public boolean existsByParentCategoryIdAndUserId(CategoryId parentCategoryId, UUID userId) {
+        return springDataRepository.existsByParentCategoryIdAndUserId(parentCategoryId.value(), userId);
+    }
+
     private static CategoryEntity toEntity(Category category) {
         return new CategoryEntity(
                 category.id().value(),

@@ -16,4 +16,6 @@ interface SpringDataCategoryRepository extends JpaRepository<CategoryEntity, UUI
     void deleteByIdAndUserId(UUID id, UUID userId);
 
     boolean existsByUserIdAndTypeAndName(UUID userId, CategoryType type, String name);
+
+    boolean existsByParentCategoryIdAndUserId(UUID parentCategoryId, UUID userId);
 }
