@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 // Sin esto, Spring Security devuelve 403 por defecto para requests sin autenticar;
                 // el contrato de la API (auth-api.yaml) exige 401 para token ausente/expirado/invalidado.
