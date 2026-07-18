@@ -6,21 +6,26 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,6 +33,7 @@ import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.ui.AccountFormScreen
 import com.walletapp.android.accounts.ui.AccountListScreen
 import com.walletapp.android.auth.AuthViewModel
+import com.walletapp.android.auth.SessionCheckState
 import com.walletapp.android.auth.ui.LoginScreen
 import com.walletapp.android.auth.ui.RegisterScreen
 import com.walletapp.android.categories.CategoryResponse
@@ -63,8 +69,19 @@ private sealed interface Screen {
 }
 
 @Composable
-private fun WalletApp() {
+private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
     var screen by remember { mutableStateOf<Screen>(Screen.Login) }
+    val sessionState by authViewModel.sessionState.collectAsState()
+
+    // Al abrir la app se valida contra el backend si el token guardado sigue siendo válido
+    // (no expiró, no fue revocado desde otro dispositivo/logout) antes de decidir la pantalla
+    // inicial — así una sesión iniciada previamente no vuelve a pedir login (spec 001, US3).
+    LaunchedEffect(Unit) { authViewModel.checkSession() }
+    LaunchedEffect(sessionState) {
+        if (sessionState == SessionCheckState.LoggedIn && screen == Screen.Login) {
+            screen = Screen.Home
+        }
+    }
 
     // Login y Home no tienen "atrás" dentro de la app — ahí el botón atrás del sistema
     // hace lo de siempre (fondo/salir). El resto de las pantallas sí tienen un padre lógico.
@@ -77,6 +94,13 @@ private fun WalletApp() {
             Screen.CategoriesList -> Screen.Home
             is Screen.CategoryForm -> Screen.CategoriesList
         }
+    }
+
+    if (sessionState == SessionCheckState.Checking) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     when (val current = screen) {

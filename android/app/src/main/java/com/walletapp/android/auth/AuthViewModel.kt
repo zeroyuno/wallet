@@ -26,6 +26,12 @@ sealed interface LoginUiState {
     data class Error(val message: String) : LoginUiState
 }
 
+sealed interface SessionCheckState {
+    data object Checking : SessionCheckState
+    data object LoggedIn : SessionCheckState
+    data object LoggedOut : SessionCheckState
+}
+
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository
@@ -36,6 +42,23 @@ class AuthViewModel @Inject constructor(
 
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState.asStateFlow()
+
+    private val _sessionState = MutableStateFlow<SessionCheckState>(SessionCheckState.Checking)
+    val sessionState: StateFlow<SessionCheckState> = _sessionState.asStateFlow()
+
+    fun checkSession() {
+        if (!authRepository.hasStoredToken()) {
+            Log.d(TAG, "checkSession() -> sin token guardado, LoggedOut")
+            _sessionState.value = SessionCheckState.LoggedOut
+            return
+        }
+        Log.d(TAG, "checkSession() -> validando token guardado")
+        viewModelScope.launch {
+            authRepository.validateSession()
+                .onSuccess { _sessionState.value = SessionCheckState.LoggedIn }
+                .onFailure { _sessionState.value = SessionCheckState.LoggedOut }
+        }
+    }
 
     fun register(email: String, password: String, displayName: String) {
         Log.d(TAG, "register() -> Loading")
@@ -76,6 +99,7 @@ class AuthViewModel @Inject constructor(
         // pareciera hacer nada — recién con el segundo, cuando la llamada de red ya había terminado).
         _loginState.value = LoginUiState.Idle
         _registerState.value = RegisterUiState.Idle
+        _sessionState.value = SessionCheckState.LoggedOut
         viewModelScope.launch {
             authRepository.logout()
             Log.d(TAG, "logout() -> token revocado en el servidor")
