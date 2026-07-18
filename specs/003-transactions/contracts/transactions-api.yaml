@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Wallet Transactions API
+  version: "1.0.0"
+  description: Contrato de la feature 003 (Transacciones). Todos los endpoints requieren
+    autenticación (JWT de la feature 001) y operan exclusivamente sobre los datos del usuario
+    autenticado. El endpoint de saldo vive bajo /api/accounts por ser la URL más natural, aunque está
+    implementado por este contexto (ver plan.md).
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/transactions:
+    get:
+      summary: Listar/filtrar las transacciones del usuario autenticado (FR-003, FR-004)
+      parameters:
+        - name: accountId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Lista de transacciones que cumplen los filtros indicados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TransactionResponse"
+    post:
+      summary: Registrar una transacción (FR-001, FR-002, FR-008, FR-009)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionRequest"
+      responses:
+        "201":
+          description: Transacción creada; el saldo de la cuenta asociada queda actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          description: Monto no positivo, fecha ausente, o categoría de tipo distinto al de la
+            transacción
+        "404":
+          description: La cuenta (o la categoría, si se indica) no existe o no pertenece al usuario
+            autenticado
+        "409":
+          description: Ya existe una transacción con el id indicado (FR-011)
+
+  /api/transactions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Editar monto, fecha, categoría o descripción de una transacción propia (FR-005)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionUpdateRequest"
+      responses:
+        "200":
+          description: Transacción actualizada; el saldo de la cuenta refleja únicamente el monto
+            actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          description: Monto no positivo, o categoría de tipo distinto al de la transacción
+        "404":
+          description: Transacción (o categoría indicada) no encontrada o no pertenece al usuario
+            autenticado (FR-007)
+    delete:
+      summary: Eliminar una transacción propia (FR-006)
+      responses:
+        "204":
+          description: Transacción eliminada; el saldo de la cuenta vuelve a su estado previo a esa
+            transacción
+        "404":
+          description: Transacción no encontrada o no pertenece al usuario autenticado (FR-007)
+
+  /api/accounts/{id}/balance:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Consultar el saldo actual de una cuenta propia (saldo inicial + transacciones)
+      responses:
+        "200":
+          description: Saldo actual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+        "404":
+          description: Cuenta no encontrada o no pertenece al usuario autenticado
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TransactionRequest:
+      type: object
+      required: [type, amount, date, accountId]
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Opcional (FR-011) — si se omite, el servidor genera un UUID v7. Si se indica,
+            el cliente es responsable de que sea único (pensado para creación offline); un id
+            duplicado responde 409.
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+        accountId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+    TransactionUpdateRequest:
+      type: object
+      required: [amount, date]
+      description: A diferencia de TransactionRequest, no incluye type ni accountId — ambos son
+        inmutables tras la creación (ver research.md).
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+    TransactionResponse:
+      allOf:
+        - $ref: "#/components/schemas/TransactionRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+    BalanceResponse:
+      type: object
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        balance:
+          type: number
