@@ -103,6 +103,17 @@ class CategoryServiceTest {
     }
 
     @Test
+    void findTypeIfOwnedByUserReturnsTypeAsString() {
+        Category category = Category.create(userId, "Comida", CategoryType.EXPENSE, null);
+        when(categoryRepository.findByIdAndUserId(category.id(), userId)).thenReturn(Optional.of(category));
+
+        CategoryService service = new CategoryService(categoryRepository);
+
+        assertThat(service.findTypeIfOwnedByUser(userId, category.id().value())).contains("EXPENSE");
+        assertThat(service.findTypeIfOwnedByUser(UUID.randomUUID(), category.id().value())).isEmpty();
+    }
+
+    @Test
     void rejectsParentFromAnotherUserOrType() {
         Category parent = Category.create(UUID.randomUUID(), "Comida", CategoryType.EXPENSE, null);
         when(categoryRepository.existsByUserIdAndTypeAndName(any(), any(), any())).thenReturn(false);

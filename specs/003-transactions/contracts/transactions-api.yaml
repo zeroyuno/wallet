@@ -80,6 +80,17 @@ paths:
         schema:
           type: string
           format: uuid
+    get:
+      summary: Ver una transacción propia puntual (FR-007)
+      responses:
+        "200":
+          description: Transacción
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "404":
+          description: Transacción no encontrada o no pertenece al usuario autenticado
     put:
       summary: Editar monto, fecha, categoría o descripción de una transacción propia (FR-005)
       requestBody:

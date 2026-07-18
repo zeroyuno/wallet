@@ -39,7 +39,10 @@ cambian, ver research.md).
   JPA; `user_id`, `account_id`, `category_id` como columnas UUID simples (sin mapear las entidades JPA
   de `account` — los contextos no comparten entidades JPA, solo IDs).
 - `JpaTransactionRepository`: implementa el puerto del dominio, incluye la query de agregación
-  (`SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END)`) para `sumNetAmountForAccount`.
+  (`SUM(CASE WHEN type = 'INCOME' THEN amount ELSE -amount END)`) para `sumNetAmountForAccount`. El
+  filtro de `findAllByUserId` (accountId/categoryId/dateFrom/dateTo) se aplica en Java sobre el
+  resultado de una query simple (`findAllByUserId(userId)`), no con parámetros opcionales en SQL —
+  ver research.md (problema de tipado de parámetros null con Postgres/Hibernate).
 
 ## Esquema (V3\_\_create_transactions.sql)
 

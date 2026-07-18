@@ -10,7 +10,9 @@ import com.walletapp.backend.account.domain.exception.AccountNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -42,6 +44,17 @@ public class AccountService {
     public void delete(UUID userId, AccountId id) {
         findOwned(userId, id);
         accountRepository.deleteByIdAndUserId(id, userId);
+    }
+
+    // Métodos de solo lectura para otros bounded contexts (ej. transaction) — devuelven únicamente
+    // tipos primitivos, nunca AccountView ni ningún tipo de account.domain, para no arrastrar una
+    // dependencia de dominio a través de la frontera del contexto (ver research.md de la feature 003).
+    public boolean existsOwnedByUser(UUID userId, UUID accountId) {
+        return accountRepository.findByIdAndUserId(AccountId.of(accountId), userId).isPresent();
+    }
+
+    public Optional<BigDecimal> getInitialBalanceIfOwnedByUser(UUID userId, UUID accountId) {
+        return accountRepository.findByIdAndUserId(AccountId.of(accountId), userId).map(Account::initialBalance);
     }
 
     private Account findOwned(UUID userId, AccountId id) {

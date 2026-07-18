@@ -150,4 +150,33 @@ class CategoryControllerIT {
     void rejectsCategoryWithoutToken() throws Exception {
         mockMvc.perform(get("/api/categories")).andExpect(status().isUnauthorized());
     }
+
+    // FR-010 (feature 003): no se puede eliminar una categoría con transacciones asociadas — mismo
+    // patrón (409 vía DataIntegrityViolationException) que ya se usa para subcategorías, ver
+    // AccountExceptionHandler y research.md de la feature 003.
+    @Test
+    void rejectsDeletingCategoryThatHasTransactions() throws Exception {
+        String token = registerAndLogin("cat-delete-with-tx@example.com");
+
+        String accountResponse = mockMvc.perform(post("/api/accounts").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Efectivo\",\"type\":\"CASH\",\"currency\":\"USD\",\"initialBalance\":100}"))
+                .andReturn().getResponse().getContentAsString();
+        String accountId = com.jayway.jsonpath.JsonPath.read(accountResponse, "$.id");
+
+        String categoryResponse = mockMvc.perform(post("/api/categories").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Comida\",\"type\":\"EXPENSE\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String categoryId = com.jayway.jsonpath.JsonPath.read(categoryResponse, "$.id");
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":10,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\",\"categoryId\":\"" + categoryId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(delete("/api/categories/" + categoryId).header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+    }
 }

@@ -87,4 +87,30 @@ class AccountServiceTest {
 
         verify(accountRepository).deleteByIdAndUserId(account.id(), userId);
     }
+
+    @Test
+    void existsOwnedByUserReflectsRepository() {
+        Account account = Account.create(userId, "Efectivo", AccountType.CASH, new CurrencyCode("USD"), BigDecimal.ZERO);
+        when(accountRepository.findByIdAndUserId(any(), any())).thenReturn(Optional.empty());
+        when(accountRepository.findByIdAndUserId(AccountId.of(account.id().value()), userId))
+                .thenReturn(Optional.of(account));
+
+        AccountService service = new AccountService(accountRepository);
+
+        assertThat(service.existsOwnedByUser(userId, account.id().value())).isTrue();
+        assertThat(service.existsOwnedByUser(userId, UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void getInitialBalanceIfOwnedByUserReturnsEmptyWhenNotOwned() {
+        Account account = Account.create(userId, "Efectivo", AccountType.CASH, new CurrencyCode("USD"), new BigDecimal("42"));
+        when(accountRepository.findByIdAndUserId(AccountId.of(account.id().value()), userId))
+                .thenReturn(Optional.of(account));
+
+        AccountService service = new AccountService(accountRepository);
+
+        assertThat(service.getInitialBalanceIfOwnedByUser(userId, account.id().value()))
+                .contains(new BigDecimal("42"));
+        assertThat(service.getInitialBalanceIfOwnedByUser(UUID.randomUUID(), account.id().value())).isEmpty();
+    }
 }

@@ -1,5 +1,31 @@
 # Research: Transacciones (ingresos y gastos)
 
+## Filtrado de transacciones (FR-004): en Java, no con parámetros opcionales en SQL
+
+**Decision**: `JpaTransactionRepository.findAllByUserId(userId, accountId, categoryId, dateFrom,
+dateTo)` trae todas las transacciones del usuario con una query simple
+(`SpringDataTransactionRepository.findAllByUserId(userId)`) y aplica los cuatro filtros con
+`.filter(...)` en Java, en vez de construir una query JPQL con condiciones tipo
+`(:param IS NULL OR columna = :param)`.
+
+**Rationale**: Se implementó primero con el patrón `(:param IS NULL OR ...)`, el enfoque más directo
+para un filtro opcional en una sola query. Funcionó para `accountId`/`categoryId` (UUID) pero falló
+para `dateFrom`/`dateTo` con `ERROR: could not determine data type of parameter` — un problema
+conocido de Postgres/JDBC: cuando la única otra aparición de un parámetro es `IS NULL`, Postgres no
+tiene contexto para inferirle un tipo. Forzar `CAST(:dateFrom AS date)` tampoco funcionó: cuando el
+valor real es `null`, Hibernate lo manda sin tipo (como `bytea`), y `CAST(bytea AS date)` es un cast
+inválido en Postgres — el error cambió pero no se resolvió. En vez de seguir peleando con el tipado
+de parámetros de Postgres/Hibernate para este caso, filtrar en Java es simple, evita el problema de
+raíz, y a esta escala (uso personal, no miles de transacciones por usuario) no tiene costo real de
+rendimiento — consistente con el principio V de la constitución (YAGNI).
+
+**Alternatives considered**:
+- `(:param IS NULL OR ...)` con `CAST(...)` — descartado, ver arriba (el error persiste con `null`).
+- JPA Specifications (construir la query dinámicamente según qué filtros vienen no-nulos) —
+  descartado por ahora: es la solución "correcta" si el volumen de datos llegara a justificarlo, pero
+  es más código y una abstracción nueva en el proyecto para un problema que, a esta escala, se
+  resuelve igual de bien filtrando en memoria.
+
 ## Identificador de transacción: UUID v7, opcionalmente provisto por el cliente (FR-011)
 
 **Decision**: `TransactionId` se genera con **UUID v7** (timestamp de 48 bits + bits aleatorios,

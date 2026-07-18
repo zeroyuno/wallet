@@ -32,7 +32,7 @@ orden hexagonal `domain → application → infrastructure`.
 
 - [x] T001 Agregar la dependencia `com.github.f4b6a3:uuid-creator` a `backend/pom.xml` (generación de
       UUID v7 para `TransactionId`, ver research.md)
-- [ ] T002 Crear migración Flyway `backend/src/main/resources/db/migration/V3__create_transactions.sql`
+- [x] T002 Crear migración Flyway `backend/src/main/resources/db/migration/V3__create_transactions.sql`
       con la tabla `transactions` (FK `ON DELETE RESTRICT` hacia `accounts`/`categories`, ver
       [data-model.md](data-model.md))
 
@@ -47,49 +47,49 @@ orden hexagonal `domain → application → infrastructure`.
 
 ### Domain (`transaction/domain`) — sin dependencias de Spring/JPA ni de `account.domain`
 
-- [ ] T003 [P] Crear value object `TransactionId` (genera UUID **v7** vía `uuid-creator` cuando no se
+- [x] T003 [P] Crear value object `TransactionId` (genera UUID **v7** vía `uuid-creator` cuando no se
       provee uno — ver research.md) y el enum `TransactionType` (INCOME, EXPENSE — propio de este
       contexto) en `backend/src/main/java/com/walletapp/backend/transaction/domain/` (depende de T001)
-- [ ] T004 [P] Crear agregado `Transaction` (factory `create(Optional<TransactionId> id, userId,
+- [x] T004 [P] Crear agregado `Transaction` (factory `create(Optional<TransactionId> id, userId,
       type, amount, date, description, accountId, categoryId)` — genera un `TransactionId` v7 si
       `id` está vacío; método `update`; `type` y `accountId` inmutables tras la creación) en
       `transaction/domain/Transaction.java` (depende de T003)
-- [ ] T005 [P] Crear puerto de salida `TransactionRepository` (incluye `existsByIdAndUserId` para
+- [x] T005 [P] Crear puerto de salida `TransactionRepository` (incluye `existsByIdAndUserId` para
       detectar un `id` duplicado provisto por el cliente, FR-011, y `sumNetAmountForAccount`) en
       `transaction/domain/TransactionRepository.java` (depende de T004)
-- [ ] T006 [P] Crear excepciones de dominio (`TransactionNotFoundException`,
+- [x] T006 [P] Crear excepciones de dominio (`TransactionNotFoundException`,
       `InvalidTransactionAccountException`, `InvalidTransactionCategoryException`,
       `CategoryTypeMismatchException`, `DuplicateTransactionIdException`) en
       `transaction/domain/exception/`
-- [ ] T007 [ARQUITECTURA] Agregar `"transaction"` a `BOUNDED_CONTEXTS` en
+- [x] T007 [ARQUITECTURA] Agregar `"transaction"` a `BOUNDED_CONTEXTS` en
       `backend/src/test/java/com/walletapp/backend/ArchitectureTest.java`
 
 ### Application (`transaction/application`)
 
-- [ ] T008 [P] Crear DTOs (`TransactionCommand` — incluye `id` opcional, `TransactionUpdateCommand`,
+- [x] T008 [P] Crear DTOs (`TransactionCommand` — incluye `id` opcional, `TransactionUpdateCommand`,
       `TransactionView`, `TransactionFilter`) en `transaction/application/dto/`
 
 ### Infrastructure — persistencia
 
-- [ ] T009 [P] Crear `TransactionEntity` (JPA), `SpringDataTransactionRepository` (incluye
+- [x] T009 [P] Crear `TransactionEntity` (JPA), `SpringDataTransactionRepository` (incluye
       `existsByIdAndUserId` y la query de agregación para `sumNetAmountForAccount`) y
       `JpaTransactionRepository` (implementa el puerto de T005) en
       `transaction/infrastructure/persistence/` (depende de T004, T005)
 
 ### Cross-context: métodos de solo lectura en `account.application` (ver research.md)
 
-- [ ] T010 [P] Agregar `AccountService.existsOwnedByUser(UUID, UUID): boolean` y
+- [x] T010 [P] Agregar `AccountService.existsOwnedByUser(UUID, UUID): boolean` y
       `AccountService.getInitialBalanceIfOwnedByUser(UUID, UUID): Optional<BigDecimal>` (devuelven
       solo tipos primitivos, nunca `AccountView`) en
       `backend/src/main/java/com/walletapp/backend/account/application/AccountService.java`, con sus
       tests unitarios en `AccountServiceTest.java`
-- [ ] T011 [P] Agregar `CategoryService.findTypeIfOwnedByUser(UUID, UUID): Optional<String>` (el tipo
+- [x] T011 [P] Agregar `CategoryService.findTypeIfOwnedByUser(UUID, UUID): Optional<String>` (el tipo
       como `String`, nunca `CategoryType`) en `account/application/CategoryService.java`, con su test
       unitario en `CategoryServiceTest.java`
 
 ### FR-010: no eliminar cuenta/categoría con transacciones asociadas
 
-- [ ] T012 Agregar `@ExceptionHandler(DataIntegrityViolationException.class)` → `409` genérico en
+- [x] T012 Agregar `@ExceptionHandler(DataIntegrityViolationException.class)` → `409` genérico en
       `account/infrastructure/web/AccountExceptionHandler.java` (depende de T002; el test de
       integración que ejercita este handler se agrega en la Fase 3, una vez que existe
       `POST /api/transactions` para crear la transacción que bloquea el delete — ver T016)
@@ -110,34 +110,34 @@ incluye; `GET /api/accounts/{id}/balance` refleja el efecto (quickstart.md, esce
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Test unitario de `TransactionService.create()`/`list()` (cuenta ajena →
+- [x] T013 [P] [US1] Test unitario de `TransactionService.create()`/`list()` (cuenta ajena →
       excepción, categoría ajena o de tipo distinto → excepción, monto ≤ 0 → excepción, `id`
       provisto por el cliente se respeta, `id` duplicado → `DuplicateTransactionIdException`; sin
       `id` se genera uno nuevo; mockeando `AccountService`/`CategoryService`/`TransactionRepository`)
       en
       `backend/src/test/java/com/walletapp/backend/transaction/application/TransactionServiceTest.java`
-- [ ] T014 [P] [US1] Test de integración de `POST`/`GET /api/transactions` y
+- [x] T014 [P] [US1] Test de integración de `POST`/`GET /api/transactions` y
       `GET /api/accounts/{id}/balance` (creación con y sin `id` propio, listado, aislamiento entre
       usuarios, 404 sobre cuenta/categoría ajena, 400 por tipo no coincidente o monto inválido, 409
       por `id` duplicado) con Testcontainers en
       `backend/src/test/java/com/walletapp/backend/transaction/infrastructure/web/TransactionControllerIT.java`
-- [ ] T015 [US1] Test unitario adicional: dos `TransactionId` generados sin `id` explícito son
+- [x] T015 [US1] Test unitario adicional: dos `TransactionId` generados sin `id` explícito son
       temporalmente ordenables (UUID v7 — comparar que el generado después sea mayor) en
       `TransactionServiceTest.java` o un test dedicado de `TransactionId`
-- [ ] T016 [US1] Test de integración: crear una transacción sobre una cuenta (o con una categoría)
+- [x] T016 [US1] Test de integración: crear una transacción sobre una cuenta (o con una categoría)
       propia y verificar que `DELETE /api/accounts/{id}` / `DELETE /api/categories/{id}` responden
       `409` (FR-010) en `AccountControllerIT.java`/`CategoryControllerIT.java` (depende de T012, T018)
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implementar `TransactionService.create()` (respeta el `id` del cliente si viene,
+- [x] T017 [US1] Implementar `TransactionService.create()` (respeta el `id` del cliente si viene,
       responde con `DuplicateTransactionIdException` si ya existe, genera uno v7 si no viene) y
       `.list()` (sin filtros todavía, eso es US3) en
       `transaction/application/TransactionService.java` (depende de T004, T005, T008, T010, T011)
-- [ ] T018 [US1] Implementar `GET /api/accounts/{id}/balance` en
+- [x] T018 [US1] Implementar `GET /api/accounts/{id}/balance` en
       `transaction/infrastructure/web/BalanceController.java` + `BalanceResponse` DTO (depende de
       T005, T010)
-- [ ] T019 [US1] Implementar `POST`/`GET /api/transactions` en
+- [x] T019 [US1] Implementar `POST`/`GET /api/transactions` en
       `transaction/infrastructure/web/TransactionController.java` + DTOs web (`TransactionRequest`
       con `id` opcional, `TransactionResponse`) + `TransactionExceptionHandler.java` (mapea
       `DuplicateTransactionIdException` → 409) (depende de T017)
@@ -157,18 +157,18 @@ escenarios 3 y 4).
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Test unitario de `TransactionService.update()`/`delete()` (el saldo tras un
+- [x] T020 [P] [US2] Test unitario de `TransactionService.update()`/`delete()` (el saldo tras un
       update refleja solo el nuevo monto, no viejo+nuevo; delete revierte el efecto; ambos rechazan
       un movimiento ajeno) en `TransactionServiceTest.java`
-- [ ] T021 [P] [US2] Test de integración de `PUT`/`DELETE /api/transactions/{id}` (éxito propio, 404
+- [x] T021 [P] [US2] Test de integración de `PUT`/`DELETE /api/transactions/{id}` (éxito propio, 404
       sobre movimiento ajeno, y verificación del saldo antes/después vía
       `GET /api/accounts/{id}/balance`) en `TransactionControllerIT.java`
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Implementar `TransactionService.update()` y `.delete()` en
+- [x] T022 [US2] Implementar `TransactionService.update()` y `.delete()` en
       `TransactionService.java` (depende de T017)
-- [ ] T023 [US2] Implementar `PUT`/`DELETE /api/transactions/{id}` + `TransactionUpdateRequest` DTO
+- [x] T023 [US2] Implementar `PUT`/`DELETE /api/transactions/{id}` + `TransactionUpdateRequest` DTO
       (sin `id`, `type` ni `accountId` — todos inmutables tras la creación, ver research.md) en
       `TransactionController.java` (depende de T022)
 
@@ -186,17 +186,17 @@ movimientos que cumplen el filtro (quickstart.md, escenario 2).
 
 ### Tests for User Story 3
 
-- [ ] T024 [P] [US3] Test unitario de `TransactionService.list()` con `TransactionFilter` (por
+- [x] T024 [P] [US3] Test unitario de `TransactionService.list()` con `TransactionFilter` (por
       cuenta, por categoría, por rango de fechas, y combinaciones) en `TransactionServiceTest.java`
-- [ ] T025 [P] [US3] Test de integración de `GET /api/transactions` con query params `accountId`,
+- [x] T025 [P] [US3] Test de integración de `GET /api/transactions` con query params `accountId`,
       `categoryId`, `dateFrom`, `dateTo` (por separado y combinados) en `TransactionControllerIT.java`
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Extender la query de `SpringDataTransactionRepository`/`JpaTransactionRepository`
+- [x] T026 [US3] Extender la query de `SpringDataTransactionRepository`/`JpaTransactionRepository`
       para aplicar `TransactionFilter` en `transaction/infrastructure/persistence/` (depende de T005,
       T009)
-- [ ] T027 [US3] Aceptar los query params `accountId`, `categoryId`, `dateFrom`, `dateTo` en
+- [x] T027 [US3] Aceptar los query params `accountId`, `categoryId`, `dateFrom`, `dateTo` en
       `GET /api/transactions` (mapeo a `TransactionFilter`) en `TransactionController.java` (depende
       de T019, T026)
 
@@ -206,12 +206,20 @@ movimientos que cumplen el filtro (quickstart.md, escenario 2).
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T028 Ejecutar `./mvnw verify` y confirmar que `domain`/`application` de `transaction` superan
-      el 80% de cobertura (constitución, principio III)
-- [ ] T029 [P] Documentar los nuevos endpoints en `README.md` (incluyendo el `id` opcional de
+- [x] T028 Ejecutar `./mvnw verify` y confirmar que `domain`/`application` de `transaction` superan
+      el 80% de cobertura (constitución, principio III) — 90-100% por paquete, confirmado
+- [x] T029 [P] Documentar los nuevos endpoints en `README.md` (incluyendo el `id` opcional de
       `POST /api/transactions`, FR-011)
-- [ ] T030 Ejecutar [quickstart.md](quickstart.md) de punta a punta (los 7 escenarios, incluyendo
+- [x] T030 Ejecutar [quickstart.md](quickstart.md) de punta a punta (los 7 escenarios, incluyendo
       aislamiento entre usuarios y el bloqueo de FR-010) contra la implementación real
+- [x] T031 [FIX] `GET /api/transactions/{id}` (FR-007 — "ver" una transacción puntual) faltaba por
+      completo: nunca se implementó pese a estar en la spec y en el propio quickstart.md (escenario
+      5). Se encontró recién al ejecutar T030 contra el backend real — la ruta sin mapear devolvía
+      `401` en vez del `404`/`405` esperable para un endpoint inexistente (causa exacta no
+      investigada a fondo; no relevante una vez agregado el endpoint real). Se agregó
+      `TransactionService.get()`, `TransactionController.get()`, se actualizó
+      `contracts/transactions-api.yaml`, y se sumaron tests unitarios + de integración (éxito propio,
+      404 ajeno)
 
 ---
 
