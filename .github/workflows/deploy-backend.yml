@@ -1,0 +1,55 @@
+name: Deploy backend to Azure Container Apps
+
+"on":
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Run tests and coverage gate
+        run: ./mvnw verify
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # az acr build (ACR Tasks) no está disponible en esta suscripción
+      # ("TasksOperationsNotAllowed") — se construye la imagen localmente en el runner
+      # (linux/amd64, la misma plataforma que espera Container Apps) y se sube con docker push,
+      # autenticando el registro vía el token de la identidad OIDC ya logueada arriba.
+      - name: Build image
+        run: docker build --platform linux/amd64 -t "${{ secrets.ACR_NAME }}.azurecr.io/backend:${{ github.sha }}" .
+
+      - name: Push image to ACR
+        run: |
+          az acr login --name "${{ secrets.ACR_NAME }}"
+          docker push "${{ secrets.ACR_NAME }}.azurecr.io/backend:${{ github.sha }}"
+
+      - name: Deploy new image to Container App
+        run: |
+          az containerapp update \
+            --name "${{ secrets.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ secrets.ACR_NAME }}.azurecr.io/backend:${{ github.sha }}"
