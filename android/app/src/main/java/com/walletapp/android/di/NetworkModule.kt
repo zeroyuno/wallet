@@ -17,11 +17,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import javax.inject.Singleton
 
-// IP local de la Mac en la red WiFi (backend corriendo ahí en :8080). Se prueba en un dispositivo
-// físico en la misma red — el emulador de Android en esta máquina no logra conectar apps normales
-// (UID no privilegiado) a 10.0.2.2 pese a que curl/Chrome/shell sí pueden, algo específico de este
-// entorno. Si volvés a usar el emulador, cambiar por "http://10.0.2.2:8080/".
-private const val BASE_URL = "http://192.168.68.113:8080/"
+// Backend en Azure Container Apps (ver infra/README.md). Antes apuntaba a la IP LAN de la Mac para
+// desarrollo local contra un dispositivo físico — ver git log de esta línea si hace falta volver a
+// apuntar a un backend local.
+private const val BASE_URL = "https://wallet-backend.gentlewave-2a95128b.brazilsouth.azurecontainerapps.io/"
 
 @Module
 @InstallIn(SingletonComponent::class)
