@@ -35,12 +35,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push image to ACR
+      # az acr build (ACR Tasks) no está disponible en esta suscripción
+      # ("TasksOperationsNotAllowed") — se construye la imagen localmente en el runner
+      # (linux/amd64, la misma plataforma que espera Container Apps) y se sube con docker push,
+      # autenticando el registro vía el token de la identidad OIDC ya logueada arriba.
+      - name: Build image
+        run: docker build --platform linux/amd64 -t "${{ secrets.ACR_NAME }}.azurecr.io/backend:${{ github.sha }}" .
+
+      - name: Push image to ACR
         run: |
-          az acr build \
-            --registry "${{ secrets.ACR_NAME }}" \
-            --image "backend:${{ github.sha }}" \
-            .
+          az acr login --name "${{ secrets.ACR_NAME }}"
+          docker push "${{ secrets.ACR_NAME }}.azurecr.io/backend:${{ github.sha }}"
 
       - name: Deploy new image to Container App
         run: |

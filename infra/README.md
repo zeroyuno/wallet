@@ -1,8 +1,8 @@
 # Despliegue del backend en Azure Container Apps
 
-Infraestructura definida en `main.bicep`: Container Apps Environment (VNet-integrado), el Container
-App del backend, Azure Container Registry, Postgres Flexible Server (acceso privado, sin IP pública) y
-Log Analytics para los logs.
+Infraestructura definida en `main.bicep`: Container Apps Environment, el Container App del backend,
+Azure Container Registry, Postgres Flexible Server (acceso público restringido por firewall) y Log
+Analytics para los logs.
 
 Este documento cubre el **bootstrap manual, que se hace una sola vez**. Después de eso, cada push a
 `main` que toque `backend/` se despliega solo vía `.github/workflows/deploy-backend.yml`.
@@ -37,6 +37,10 @@ az deployment group create \
 
 La primera vez, el Container App levanta con una imagen placeholder pública (el ACR todavía está
 vacío) — es esperado; el primer deploy real llega con el paso siguiente.
+
+**Nota**: si esta primera ejecución falla con `IdentityDoesNotExist` en el paso del Container App, es
+una demora normal de propagación de la identidad administrada recién creada en Azure AD — simplemente
+volvé a correr el mismo comando (es idempotente, solo reintenta el recurso que falló).
 
 Guardá los outputs del deployment (`az deployment group show --resource-group wallet-rg --name main
 --query properties.outputs`) — se necesitan `identityClientId`, `identityResourceId`, `acrName` y
@@ -82,7 +86,9 @@ En Settings → Secrets and variables → Actions del repo `zeroyuno/wallet`:
 ## Después del bootstrap
 
 Cada push a `main` que toque `backend/**` dispara `.github/workflows/deploy-backend.yml`: corre
-`mvn verify`, construye la imagen, la sube al ACR y actualiza el Container App. No hace falta volver a
+`mvn verify`, construye la imagen con `docker build --platform linux/amd64` y la sube al ACR
+(autenticando vía el token de la identidad OIDC — `az acr build`/ACR Tasks no está disponible en
+suscripciones nuevas sin verificar, ver Notas), y actualiza el Container App. No hace falta volver a
 correr nada de este documento salvo que cambie la infraestructura (en ese caso, repetir el paso 2 con
 el `main.bicep` actualizado).
 
@@ -95,11 +101,27 @@ curl https://<containerAppFqdn>/actuator/health
 
 ## Notas
 
+- **Si construís la imagen a mano en una Mac Apple Silicon (o cualquier host ARM64), agregá siempre
+  `--platform linux/amd64` al `docker build`** — Container Apps corre en amd64, y una imagen ARM64 falla
+  el pull con un error confuso ("no match for platform in manifest"), fácil de confundir con un
+  problema de permisos/red. Fue la causa real de una sesión larga de troubleshooting antes de llegar a
+  esta arquitectura. El workflow de CI ya lo hace bien porque corre en runners `ubuntu-latest` (amd64).
 - `minReplicas: 0` — el Container App puede escalar a cero cuando no hay tráfico (ahorra costo en un
   uso personal), a costa de un cold start de unos segundos en el primer request tras estar inactivo.
   Si molesta, subir `minReplicas` a 1 en `main.bicep` y volver a desplegar.
-- Postgres Flexible Server no tiene IP pública — solo es alcanzable desde dentro de la VNet (donde vive
-  el Container App). Para conectarse a mano (ej. `psql`) hace falta un jump host en la misma VNet o
-  usar `az postgres flexible-server connect` con VNet peering temporal.
+- **Postgres Flexible Server tiene acceso público pero restringido por firewall** (solo servicios de
+  Azure, regla `AllowAzureServices`) + SSL obligatorio (`sslmode=require` en `DB_URL`) + password
+  fuerte. La primera versión de esta infraestructura integraba Postgres y el Container Apps Environment
+  a una VNet privada (sin IP pública en Postgres), pero se revirtió: en esta suscripción, los pulls de
+  imagen desde el ACR fallaban de forma consistente y confusa (`unauthorized`/`not found`) únicamente
+  cuando el Container Apps Environment estaba VNet-integrado, sin relación real con la causa final (el
+  mismatch de arquitectura ARM64/AMD64 de arriba). Si en el futuro se quiere volver a un Postgres 100%
+  privado, revisar `git log` de este archivo para la versión con VNet.
+- Para conectarse a Postgres a mano (ej. `psql`), agregar temporalmente tu IP a las reglas de firewall:
+  `az postgres flexible-server firewall-rule create --name wallet-pg-<sufijo> --resource-group
+  wallet-rg --rule-name mi-ip --start-ip-address <tu-ip> --end-ip-address <tu-ip>`.
+- `az acr build` (ACR Tasks) devuelve `TasksOperationsNotAllowed` en suscripciones nuevas/no
+  verificadas por Microsoft — por eso el workflow de CI construye la imagen con `docker build` en el
+  propio runner en vez de delegarlo al ACR.
 - La app Android (`android/.../di/NetworkModule.kt`) todavía apunta a la IP LAN de desarrollo — se
-  actualiza en un fix aparte una vez que este backend esté desplegado y tengamos la URL de producción.
+  actualiza en un fix aparte ahora que el backend ya está desplegado (`containerAppFqdn` del output).

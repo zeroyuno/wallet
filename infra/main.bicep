@@ -1,5 +1,15 @@
 // Infraestructura del backend en Azure Container Apps. Ver infra/README.md para el bootstrap manual
 // (una sola vez) y specs de referencia en el plan de despliegue de esta feature.
+//
+// Nota sobre la ausencia de VNet: la primera versión de este archivo integraba el Container Apps
+// Environment y Postgres Flexible Server a una VNet privada (Postgres sin IP pública). Se revirtió
+// porque, en esta suscripción, los pulls de imagen desde el ACR fallaban consistentemente
+// ("unauthorized"/"not found") únicamente cuando el Container Apps Environment estaba VNet-integrado
+// — con identidad administrada, con credenciales admin del ACR, y con un tag nuevo (se descartó
+// caché); el propio `az acr check-health` confirmaba el registro sano. No se pudo abrir un ticket de
+// soporte de Azure para confirmar la causa exacta (el plan gratuito no lo permite). Postgres pasa a
+// acceso público restringido por firewall (solo servicios de Azure) + password fuerte + SSL
+// obligatorio en vez de aislamiento de red completo — un trade-off razonable, no ideal.
 
 @description('Región de Azure para todos los recursos.')
 param location string = 'brazilsouth'
@@ -40,66 +50,8 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   }
 }
 
-// --- Red: VNet con subred para Container Apps y subred delegada para Postgres ---
-
-resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
-  name: '${namePrefix}-vnet'
-  location: location
-  properties: {
-    addressSpace: {
-      addressPrefixes: ['10.20.0.0/16']
-    }
-    subnets: [
-      {
-        name: 'container-apps'
-        properties: {
-          addressPrefix: '10.20.0.0/23'
-          delegations: [
-            {
-              name: 'Microsoft.App.environments'
-              properties: {
-                serviceName: 'Microsoft.App/environments'
-              }
-            }
-          ]
-        }
-      }
-      {
-        name: 'postgres'
-        properties: {
-          addressPrefix: '10.20.2.0/24'
-          delegations: [
-            {
-              name: 'Microsoft.DBforPostgreSQL.flexibleServers'
-              properties: {
-                serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers'
-              }
-            }
-          ]
-        }
-      }
-    ]
-  }
-}
-
-resource postgresPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: '${postgresServerName}.private.postgres.database.azure.com'
-  location: 'global'
-}
-
-resource postgresDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: postgresPrivateDnsZone
-  name: '${namePrefix}-pg-dns-link'
-  location: 'global'
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
-// --- Base de datos: Postgres Flexible Server, acceso privado (sin IP pública) ---
+// --- Base de datos: Postgres Flexible Server, acceso público restringido por firewall ---
+// (ver nota al inicio del archivo sobre por qué no está en una VNet privada)
 
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
   name: postgresServerName
@@ -116,8 +68,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview'
       storageSizeGB: 32
     }
     network: {
-      delegatedSubnetResourceId: vnet.properties.subnets[1].id
-      privateDnsZoneArmResourceId: postgresPrivateDnsZone.id
+      publicNetworkAccess: 'Enabled'
     }
     highAvailability: {
       mode: 'Disabled'
@@ -127,14 +78,22 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview'
       geoRedundantBackup: 'Disabled'
     }
   }
-  dependsOn: [
-    postgresDnsZoneLink
-  ]
 }
 
 resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
   parent: postgres
   name: databaseName
+}
+
+// Regla especial de Azure (start=end=0.0.0.0): permite acceso solo desde recursos de Azure
+// (incluye el Container App), no desde internet en general.
+resource postgresFirewallAzureServices 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+  parent: postgres
+  name: 'AllowAzureServices'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
 }
 
 // --- Registro de contenedores ---
@@ -167,7 +126,7 @@ resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
-// --- Container Apps Environment (VNet-integrado) ---
+// --- Container Apps Environment (sin VNet, ver nota al inicio del archivo) ---
 
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: '${namePrefix}-env'
@@ -179,9 +138,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         customerId: logAnalytics.properties.customerId
         sharedKey: logAnalytics.listKeys().primarySharedKey
       }
-    }
-    vnetConfiguration: {
-      infrastructureSubnetId: vnet.properties.subnets[0].id
     }
   }
 }
@@ -234,7 +190,7 @@ resource backendApp 'Microsoft.App/containerApps@2023-05-01' = {
           env: [
             {
               name: 'DB_URL'
-              value: 'jdbc:postgresql://${postgres.properties.fullyQualifiedDomainName}:5432/${databaseName}'
+              value: 'jdbc:postgresql://${postgres.properties.fullyQualifiedDomainName}:5432/${databaseName}?sslmode=require'
             }
             {
               name: 'DB_USER'
