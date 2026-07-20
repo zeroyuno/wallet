@@ -17,6 +17,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # BackendApplicationTests.contextLoads levanta el contexto completo de Spring (no usa
+    # Testcontainers, a diferencia de los *IT) y necesita un Postgres real en localhost:5432 —
+    # localmente lo provee docker-compose.yml; acá se replica con el mismo servicio/credenciales.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: wallet
+          POSTGRES_USER: wallet
+          POSTGRES_PASSWORD: wallet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
