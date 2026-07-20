@@ -36,6 +36,9 @@ var postgresServerName = '${namePrefix}-pg-${uniqueString(resourceGroup().id)}'
 var databaseName = 'wallet'
 var identityName = '${namePrefix}-backend-identity'
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+// AcrPush ya incluye permisos de pull, pero se mantiene el rol AcrPull explícito abajo para dejar
+// claro cuál lo necesita solo para pullear (el Container App) — el workflow de CI usa AcrPush.
+var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'
 
 // --- Observabilidad ---
 
@@ -109,7 +112,8 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
 }
 
-// --- Identidad administrada para el Container App (AcrPull + federated credential de GitHub OIDC, ver README) ---
+// --- Identidad administrada, usada por el Container App (pull) y por el workflow de CI vía OIDC
+// (push) — ver federated credential y roles en README ---
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
@@ -121,6 +125,16 @@ resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
   scope: acr
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource acrPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, identity.id, acrPushRoleId)
+  scope: acr
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
   }
