@@ -1,0 +1,105 @@
+openapi: 3.0.3
+info:
+  title: Wallet Imports API
+  version: "1.0.0"
+  description: Contrato de la feature 005 (Importar desde BudgetBakers Wallet). Todos los endpoints
+    requieren autenticación (JWT de la feature 001) y operan exclusivamente sobre los datos del usuario
+    autenticado. No confundir con la API externa de BudgetBakers Wallet que este backend consume (ver
+    research.md) — este archivo describe solo los endpoints que exponemos nosotros.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/imports:
+    post:
+      summary: Iniciar (o reanudar) una importación desde BudgetBakers Wallet (FR-001, FR-008)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartImportRequest"
+      responses:
+        "202":
+          description: Importación aceptada y corriendo en segundo plano (o reanudada si había una
+            interrumpida por rate limit para este usuario)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResponse"
+        "400":
+          description: Token de Wallet inválido o vacío
+        "401":
+          description: Token JWT propio ausente, expirado o inválido
+
+  /api/imports/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Consultar el estado y resultado de una importación propia (FR-007, US3)
+      responses:
+        "200":
+          description: Estado actual de la importación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResponse"
+        "404":
+          description: Importación no encontrada o no pertenece al usuario autenticado
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    StartImportRequest:
+      type: object
+      required: [walletApiToken]
+      properties:
+        walletApiToken:
+          type: string
+          description: Token de la API de BudgetBakers Wallet del usuario. No se persiste — solo vive
+            en memoria durante esta corrida.
+    ImportResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED, PAUSED_RATE_LIMIT, FAILED]
+        accountsImported:
+          type: integer
+        categoriesImported:
+          type: integer
+        transactionsImported:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportErrorItem"
+        startedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+    ImportErrorItem:
+      type: object
+      properties:
+        entityType:
+          type: string
+          enum: [ACCOUNT, CATEGORY, TRANSACTION]
+        externalId:
+          type: string
+        reason:
+          type: string
