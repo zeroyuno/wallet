@@ -48,13 +48,21 @@ Guardá los outputs del deployment (`az deployment group show --resource-group w
 
 ## 3. Configurar OIDC para GitHub Actions (sin secretos de larga duración)
 
+**Importante**: el `subject` no es simplemente `repo:<org>/<repo>:ref:refs/heads/<branch>` — GitHub
+Actions ahora incluye los IDs numéricos inmutables de la org y el repo (para que un federated
+credential no quede apuntando por error a otro recurso si el repo se renombra). Para este repo, el
+subject real es `repo:zeroyuno@54330662/wallet@1304442946:ref:refs/heads/main` — se confirmó leyendo
+el log de un run fallido (`AADSTS700213: No matching federated identity record found for presented
+assertion subject '...'` ya trae el valor exacto que hay que usar). Si cloná este setup para otro
+repo, corré primero con cualquier subject, dejá que falle una vez, y copiá el subject real del error.
+
 ```bash
 az identity federated-credential create \
   --name github-actions-main \
   --identity-name wallet-backend-identity \
   --resource-group wallet-rg \
   --issuer https://token.actions.githubusercontent.com \
-  --subject repo:zeroyuno/wallet:ref:refs/heads/main \
+  --subject "repo:zeroyuno@54330662/wallet@1304442946:ref:refs/heads/main" \
   --audiences api://AzureADTokenExchange
 ```
 
