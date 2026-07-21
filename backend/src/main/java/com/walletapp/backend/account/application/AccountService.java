@@ -5,6 +5,7 @@ import com.walletapp.backend.account.application.dto.AccountView;
 import com.walletapp.backend.account.domain.Account;
 import com.walletapp.backend.account.domain.AccountId;
 import com.walletapp.backend.account.domain.AccountRepository;
+import com.walletapp.backend.account.domain.AccountType;
 import com.walletapp.backend.account.domain.CurrencyCode;
 import com.walletapp.backend.account.domain.exception.AccountNotFoundException;
 import org.springframework.stereotype.Component;
@@ -55,6 +56,16 @@ public class AccountService {
 
     public Optional<BigDecimal> getInitialBalanceIfOwnedByUser(UUID userId, UUID accountId) {
         return accountRepository.findByIdAndUserId(AccountId.of(accountId), userId).map(Account::initialBalance);
+    }
+
+    // Método de escritura para otros bounded contexts (ej. walletimport) — recibe y devuelve
+    // únicamente tipos primitivos, nunca AccountType/CurrencyCode ni ningún tipo de account.domain,
+    // mismo criterio que los métodos de lectura de arriba (ver research.md de la feature 005).
+    public UUID createFromExternalImport(UUID userId, String name, String accountTypeName, String currencyCode,
+                                          BigDecimal initialBalance) {
+        Account account = Account.create(userId, name, AccountType.valueOf(accountTypeName),
+                new CurrencyCode(currencyCode), initialBalance);
+        return accountRepository.save(account).id().value();
     }
 
     private Account findOwned(UUID userId, AccountId id) {

@@ -67,6 +67,27 @@ public class CategoryService {
                 .map(category -> category.type().name());
     }
 
+    // Métodos de escritura para otros bounded contexts (ej. walletimport) — reciben y devuelven
+    // únicamente tipos primitivos, nunca CategoryType/CategoryId, mismo criterio que
+    // findTypeIfOwnedByUser (ver research.md de la feature 005).
+    public UUID createFromExternalImport(UUID userId, String name, String categoryTypeName) {
+        CategoryType type = CategoryType.valueOf(categoryTypeName);
+        if (categoryRepository.existsByUserIdAndTypeAndName(userId, type, name)) {
+            throw new DuplicateCategoryException("Category already exists: " + name + " (" + type + ")");
+        }
+        Category category = Category.create(userId, name, type, null);
+        return categoryRepository.save(category).id().value();
+    }
+
+    // Segunda pasada de la importación de categorías (research.md #4): asigna el padre ya
+    // resuelto, una vez creadas todas las categorías de la corrida.
+    public void setParentCategoryIfOwnedByUser(UUID userId, UUID categoryId, UUID parentCategoryId) {
+        Category category = findOwned(userId, CategoryId.of(categoryId));
+        validateParent(userId, category.type(), category.id(), parentCategoryId);
+        category.rename(category.name(), CategoryId.of(parentCategoryId));
+        categoryRepository.save(category);
+    }
+
     private Category findOwned(UUID userId, CategoryId id) {
         return categoryRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new CategoryNotFoundException("Category not found: " + id.value()));

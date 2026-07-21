@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,6 +90,29 @@ public class TransactionService {
                 .orElseThrow(() -> new InvalidTransactionAccountException(
                         "Account not found or not owned: " + accountId));
         return initialBalance.add(transactionRepository.sumNetAmountForAccount(userId, accountId));
+    }
+
+    // Método de escritura para otros bounded contexts (ej. walletimport) — recibe y devuelve
+    // únicamente tipos primitivos, nunca TransactionType ni ningún tipo de transaction.domain
+    // (mismo criterio que accountService/categoryService, ver research.md de la feature 005).
+    // A diferencia de create(), si la categoría no coincide en tipo no falla toda la operación:
+    // el movimiento se importa igual pero sin esa categoría (research.md #3, limitación aceptada).
+    public UUID createFromExternalImport(UUID userId, String transactionTypeName, BigDecimal amount,
+                                          LocalDate date, String description, UUID accountId, UUID categoryId) {
+        validateAccount(userId, accountId);
+        TransactionType type = TransactionType.valueOf(transactionTypeName);
+
+        UUID resolvedCategoryId = null;
+        if (categoryId != null) {
+            String categoryType = categoryService.findTypeIfOwnedByUser(userId, categoryId).orElse(null);
+            if (type.name().equals(categoryType)) {
+                resolvedCategoryId = categoryId;
+            }
+        }
+
+        Transaction transaction = Transaction.create(Optional.empty(), userId, type, amount, date, description,
+                accountId, resolvedCategoryId);
+        return transactionRepository.save(transaction).id().value();
     }
 
     private void validateAccount(UUID userId, UUID accountId) {

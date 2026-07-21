@@ -32,11 +32,11 @@ puntuales en `account/` y `transaction/` (nuevos métodos de creación cross-con
 
 **Purpose**: Esqueleto del nuevo contexto y su migración de base de datos.
 
-- [ ] T001 Crear migración `backend/src/main/resources/db/migration/V5__create_imports.sql`: tablas
+- [X] T001 Crear migración `backend/src/main/resources/db/migration/V5__create_imports.sql`: tablas
       `imports` (estado, contadores, cursor), `import_errors` (detalle por importación) e
       `import_external_refs` (mapeo id-Wallet → id-propio, único por `user_id`+`entity_type`+
       `external_id`, ver data-model.md)
-- [ ] T002 [P] Crear el esqueleto de paquetes
+- [X] T002 [P] Crear el esqueleto de paquetes
       `backend/src/main/java/com/walletapp/backend/walletimport/{domain,application/dto,infrastructure/{persistence,client,web/dto}}`
 
 **Checkpoint**: `./mvnw compile` compila con los paquetes vacíos y la migración aplicada.
@@ -50,32 +50,32 @@ user stories.
 
 **⚠️ CRITICAL**: Bloquea todas las user stories.
 
-- [ ] T003 Dominio: `ImportId`, `ImportStatus` (IN_PROGRESS/COMPLETED/PAUSED_RATE_LIMIT/FAILED),
+- [X] T003 Dominio: `ImportId`, `ImportStatus` (IN_PROGRESS/COMPLETED/PAUSED_RATE_LIMIT/FAILED),
       `ExternalEntityType` (ACCOUNT/CATEGORY/TRANSACTION), `ImportError` (value object) en
       `walletimport/domain/`
-- [ ] T004 Dominio: agregado `Import` (factory `start(userId)`, `recordAccountImported()`,
+- [X] T004 Dominio: agregado `Import` (factory `start(userId)`, `recordAccountImported()`,
       `recordCategoryImported()`, `recordTransactionImported()`, `recordError(entityType, externalId,
       reason)`, `pauseForRateLimit(cursorPhase, cursorRecordDate)`, `complete()`, `fail()`,
       `reconstitute(...)`) — depende de T003
-- [ ] T005 Dominio: puertos `ImportRepository`, `ExternalReferenceRepository` (registrar/consultar
+- [X] T005 Dominio: puertos `ImportRepository`, `ExternalReferenceRepository` (registrar/consultar
       mapeo id-Wallet → id-propio) y excepciones `ImportNotFoundException`,
       `InvalidWalletTokenException`, `RateLimitExceededException` — depende de T004
-- [ ] T006 [P] Infraestructura: `ImportEntity` (JPA, incluye `ImportError` embebido/tabla hija),
+- [X] T006 [P] Infraestructura: `ImportEntity` (JPA, incluye `ImportError` embebido/tabla hija),
       `SpringDataImportRepository`, `JpaImportRepository` (implementa el puerto) — depende de T005
-- [ ] T007 [P] Infraestructura: `ExternalReferenceEntity` (JPA), `SpringDataExternalReferenceRepository`,
+- [X] T007 [P] Infraestructura: `ExternalReferenceEntity` (JPA), `SpringDataExternalReferenceRepository`,
       `JpaExternalReferenceRepository` (implementa el puerto) — depende de T005
-- [ ] T008 Application: puerto `WalletImportGateway` (métodos `listAccounts`, `listCategories`,
+- [X] T008 Application: puerto `WalletImportGateway` (métodos `listAccounts`, `listCategories`,
       `listRecords(fromDate, offset, limit)`) + DTOs `WalletAccountDto`/`WalletCategoryDto`/
       `WalletRecordDto`/`WalletPageDto` en `walletimport/application/dto/` — depende de T002
-- [ ] T009 Infraestructura: `WalletApiHttpClient` (implementa `WalletImportGateway` con `RestClient`
+- [X] T009 Infraestructura: `WalletApiHttpClient` (implementa `WalletImportGateway` con `RestClient`
       contra la API real de Wallet, ver research.md #1; mapea `429` a `RateLimitExceededException` y
       `401` a `InvalidWalletTokenException`) — depende de T008
-- [ ] T010 [P] Config: `WalletImportAsyncConfig` (`@EnableAsync` + `TaskExecutor`) en
+- [X] T010 [P] Config: `WalletImportAsyncConfig` (`@EnableAsync` + `TaskExecutor`) en
       `walletimport/infrastructure/`
-- [ ] T011 [P] Test fixture: `FakeWalletImportGateway` (`@TestConfiguration`, `@Primary` en perfil de
+- [X] T011 [P] Test fixture: `FakeWalletImportGateway` (`@TestConfiguration`, `@Primary` en perfil de
       test, datos fijos configurables por test) para los tests de integración, sin llamar a la API real
       de Wallet (ver research.md — Testing) — depende de T008
-- [ ] T012 ArchUnit: agregar `"walletimport"` a `BOUNDED_CONTEXTS` en `ArchitectureTest.java`
+- [X] T012 ArchUnit: agregar `"walletimport"` a `BOUNDED_CONTEXTS` en `ArchitectureTest.java`
 
 **Checkpoint**: El contexto `walletimport` compila, tiene sus puertos y su cliente HTTP listo para
 inyectarse; el fixture de test está disponible para las user stories.
@@ -92,29 +92,29 @@ subcategoría, iniciar la importación y verificar que ambas aparecen en "Mis cu
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Agregar `AccountService.createFromExternalImport(userId, name, accountTypeName,
+- [X] T013 [US1] Agregar `AccountService.createFromExternalImport(userId, name, accountTypeName,
       currency, initialBalance): UUID` — mapea el `String` de tipo de cuenta al `AccountType` propio
       según la tabla de research.md #2 (fallback a `OTHER`) — depende de Foundational
-- [ ] T014 [P] [US1] Tests unitarios del nuevo método en `AccountServiceTest.java` (cada fila de la
+- [X] T014 [P] [US1] Tests unitarios del nuevo método en `AccountServiceTest.java` (cada fila de la
       tabla de mapeo, incluido el fallback) — depende de T013
-- [ ] T015 [US1] Agregar `CategoryService.createFromExternalImport(userId, name, categoryTypeName,
+- [X] T015 [US1] Agregar `CategoryService.createFromExternalImport(userId, name, categoryTypeName,
       parentCategoryId): UUID` — depende de Foundational
-- [ ] T016 [P] [US1] Tests unitarios del nuevo método en `CategoryServiceTest.java` — depende de T015
-- [ ] T017 [US1] `ImportService.importAccounts(...)`: trae cuentas de Wallet vía el gateway,
+- [X] T016 [P] [US1] Tests unitarios del nuevo método en `CategoryServiceTest.java` — depende de T015
+- [X] T017 [US1] `ImportService.importAccounts(...)`: trae cuentas de Wallet vía el gateway,
       verifica idempotencia contra `ExternalReferenceRepository`, mapea y crea vía
       `AccountService.createFromExternalImport`, registra la referencia externa y el contador
       (FR-002, FR-006) — depende de T004, T005, T009, T013
-- [ ] T018 [US1] `ImportService.importCategories(...)` en dos pasadas (research.md #4): primera
+- [X] T018 [US1] `ImportService.importCategories(...)` en dos pasadas (research.md #4): primera
       pasada crea sin padre e infiere el tipo desde `group.id` (research.md #3); segunda pasada resuelve
       `parentCategoryId` vía las referencias ya registradas (FR-003) — depende de T015, T017
-- [ ] T019 [US1] `ImportController`: `POST /api/imports` (valida token no vacío, crea `Import` en
+- [X] T019 [US1] `ImportController`: `POST /api/imports` (valida token no vacío, crea `Import` en
       `IN_PROGRESS`, dispara `ImportService.processImport(...)` de forma async, responde `202` con el
       `id`) + `StartImportRequest`/`ImportResponse` + `ImportExceptionHandler` (FR-001, FR-009) —
       depende de T017, T018
-- [ ] T020 [P] [US1] Tests unitarios de `ImportService` para `importAccounts`/`importCategories`
+- [X] T020 [P] [US1] Tests unitarios de `ImportService` para `importAccounts`/`importCategories`
       (mockeando `AccountService`/`CategoryService`/`WalletImportGateway`/los repos) — depende de T017,
       T018
-- [ ] T021 [US1] Test de integración `ImportControllerIT`: inicia una importación con
+- [X] T021 [US1] Test de integración `ImportControllerIT`: inicia una importación con
       `FakeWalletImportGateway` y verifica que las cuentas y categorías (con jerarquía) quedan creadas
       correctamente — depende de T011, T019
 
@@ -132,26 +132,26 @@ historial y verificar que aparecen en "Mis movimientos" con monto, fecha, tipo y
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Agregar `TransactionService.createFromExternalImport(userId, type, amount, date,
+- [X] T022 [US2] Agregar `TransactionService.createFromExternalImport(userId, type, amount, date,
       description, accountId, categoryId): UUID` — depende de Foundational
-- [ ] T023 [P] [US2] Tests unitarios del nuevo método en `TransactionServiceTest.java` — depende de
+- [X] T023 [P] [US2] Tests unitarios del nuevo método en `TransactionServiceTest.java` — depende de
       T022
-- [ ] T024 [US2] `ImportService.importTransactions(...)`: pagina movimientos de Wallet desde el cursor
+- [X] T024 [US2] `ImportService.importTransactions(...)`: pagina movimientos de Wallet desde el cursor
       (`recordDate`, ver research.md #5), resuelve `accountId`/`categoryId` vía
       `ExternalReferenceRepository` (si no resuelve, registra `ImportError` y continúa con el resto en
       vez de interrumpir — Edge Cases de spec.md), arma la descripción desde `counterParty`+`note`
       (data-model.md), aplica idempotencia (FR-004, FR-005, FR-006) — depende de T022
-- [ ] T025 [US2] `ImportService`: al recibir `RateLimitExceededException` desde el gateway, pausa la
+- [X] T025 [US2] `ImportService`: al recibir `RateLimitExceededException` desde el gateway, pausa la
       importación (`pauseForRateLimit` con el cursor tal cual quedó) y termina la corrida sin marcarla
       como fallida (FR-008) — depende de T024
-- [ ] T026 [US2] `ImportService`/`ImportController`: al iniciar una importación para un usuario que ya
+- [X] T026 [US2] `ImportService`/`ImportController`: al iniciar una importación para un usuario que ya
       tiene una en estado `PAUSED_RATE_LIMIT`, continuar esa misma importación desde su cursor en vez
       de crear una nueva (FR-008) — depende de T019, T025
-- [ ] T027 [P] [US2] Tests unitarios: idempotencia de movimientos, movimiento con cuenta/categoría no
+- [X] T027 [P] [US2] Tests unitarios: idempotencia de movimientos, movimiento con cuenta/categoría no
       resuelta se omite y queda registrado como error, pausa por rate limit con el cursor correcto, y
       reanudación que continúa desde ese cursor sin repetir lo ya importado — depende de T024, T025,
       T026
-- [ ] T028 [US2] Test de integración: correr la importación dos veces sobre los mismos datos de
+- [X] T028 [US2] Test de integración: correr la importación dos veces sobre los mismos datos de
       `FakeWalletImportGateway` no duplica ninguna cuenta, categoría ni movimiento (FR-006, SC-003,
       quickstart escenario 3) — depende de T021, T027
 
@@ -169,12 +169,12 @@ coincidir exactamente con lo que había en la cuenta de Wallet usada.
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] `ImportController`: `GET /api/imports/{id}` (propio del usuario autenticado; `404` si
+- [X] T029 [US3] `ImportController`: `GET /api/imports/{id}` (propio del usuario autenticado; `404` si
       no existe o pertenece a otro usuario, no `403` — mismo patrón ya usado en el resto de la API)
       (FR-007, FR-010) — depende de T019
-- [ ] T030 [P] [US3] Tests unitarios de `ImportService.get(...)` (aislamiento por usuario) — depende de
+- [X] T030 [P] [US3] Tests unitarios de `ImportService.get(...)` (aislamiento por usuario) — depende de
       T029
-- [ ] T031 [US3] Test de integración: `GET` expone `errors[]` con `entityType`/`externalId`/`reason`
+- [X] T031 [US3] Test de integración: `GET` expone `errors[]` con `entityType`/`externalId`/`reason`
       cuando hubo movimientos omitidos durante la importación; verifica aislamiento entre usuarios
       (`404`, no `403`) — depende de T029
 
@@ -184,10 +184,11 @@ coincidir exactamente con lo que había en la cuenta de Wallet usada.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T032 Verificar cobertura JaCoCo >80% en `domain`/`application` de `walletimport`
+- [X] T032 Verificar cobertura JaCoCo >80% en `domain`/`application` de `walletimport`
 - [ ] T033 [P] Correr los 6 escenarios de `quickstart.md` manualmente contra la API real de
-      BudgetBakers Wallet, con datos de prueba propios en una cuenta de Wallet real
-- [ ] T034 Revisar que los mensajes de `ImportError` sean legibles para el usuario (sin detalles
+      BudgetBakers Wallet, con datos de prueba propios en una cuenta de Wallet real (pendiente: requiere
+      un token real de Wallet, no disponible en este entorno — ver nota en WalletApiHttpClient.java)
+- [X] T034 Revisar que los mensajes de `ImportError` sean legibles para el usuario (sin detalles
       técnicos), consistente con el resto de la app
 
 ---
