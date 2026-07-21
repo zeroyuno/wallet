@@ -26,3 +26,6 @@ android/captures/
 # Env files with secrets
 .env
 *.env.local
+
+# Scripts de prueba manual locales (pueden manejar tokens/credenciales, no se versionan)
+scripts/

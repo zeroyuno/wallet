@@ -7,9 +7,9 @@ controlamos ni lo duplicamos — se documenta acá exactamente qué se usa, para
 
 | Endpoint | Uso |
 |---|---|
-| `GET /v1/api/accounts` | Listar cuentas del usuario (FR-002). Campos usados: `id`, `name`, `accountType`, `currencyCode`, `initialBalance.value`. |
-| `GET /v1/api/categories` | Listar categorías del usuario (FR-003). Campos usados: `id`, `name`, `parentId`, `group.id`. |
-| `GET /v1/api/records` | Listar movimientos, paginado (`limit`/`offset`, máx. 200 por página) y filtrado por `recordDate` (FR-004). Campos usados: `id`, `accountId`, `amount.value`, `amount.currencyCode`, `recordDate`, `recordType`, `categoryId`, `counterParty`, `note`. |
+| `GET /v1/api/accounts` | Listar cuentas del usuario (FR-002). Paginado (`limit`/`offset`/`nextOffset`, envuelto en `{"accounts": [...], ...}`, límite 1-200). Campos usados: `id`, `name`, `accountType`, `initialBalance.value`, `initialBalance.currencyCode` (no hay `currencyCode` a nivel raíz). |
+| `GET /v1/api/categories` | Listar categorías del usuario (FR-003). Paginado igual que accounts, envuelto en `{"categories": [...], ...}`. Campos usados: `id`, `name`, `parentId`, `group.id`. |
+| `GET /v1/api/records` | Listar movimientos, paginado (`limit`/`offset`, máx. 200 por página), envuelto en `{"records": [...], ...}`, filtrado por `recordDate` (FR-004) con sintaxis de operador (`recordDate=gte.<ISO-8601 instant>`, ver decisión #8). Campos usados: `id`, `accountId`, `amount.value` (con signo: negativo en gastos, ver #8), `recordDate`, `recordType`, `category.id` (objeto anidado, no `categoryId` plano), `counterParty`, `note`, `paymentType`, `recordState`, `transfer.mirrorRecord.id`, `labels[].name`. |
 
 Autenticación: `Authorization: Bearer <token>` — el token lo genera el usuario desde su propia cuenta
 de Wallet (fuera del alcance de esta spec) y se recibe en el request de inicio de la importación, sin
@@ -17,6 +17,12 @@ persistirlo (Assumptions de spec.md).
 
 Rate limit: 500 requests/hora (headers `X-RateLimit-Remaining`, respuesta `429` con `Retry-After`
 cuando se excede) — ver decisión 5 (reanudación).
+
+**Nota (T033, verificación con datos reales)**: la forma inicial de este documento se basó en una
+lectura del OpenAPI que resultó incompleta en varios puntos — quedó corregida recién al probar contra
+la API real y releer el OpenAPI con más cuidado (ver decisión #8 para el detalle completo). Los
+supuestos sobre `photos`/`place` (fuera de alcance) y el resto de los endpoints/autenticación/rate
+limit sí se confirmaron correctos.
 
 ## 2. Mapeo de tipo de cuenta (Wallet → propio)
 
@@ -141,3 +147,35 @@ entre dos transacciones — rechazado por ahora: requeriría detectar y vincular
 par, un cambio de mayor alcance que la spec original de transferencias (`Assumptions` de spec.md:
 "transfers as two movements" independientes) no contemplaba; guardar el id crudo cumple con no perder
 el dato sin ese rediseño.
+
+**Correcciones tras probar contra la API real y releer el OpenAPI con más cuidado (T033)**: la
+implementación inicial de `WalletApiHttpClient` tenía tres errores reales, encontrados recién al
+correr una importación con datos de una cuenta de Wallet real:
+
+1. **Signo del monto**: Wallet manda `amount.value` con signo (negativo en gastos, positivo en
+   ingresos); nuestro dominio (`Transaction`) siempre exige magnitud positiva y expresa la dirección
+   solo con `type`. Sin normalizar esto, **todo gasto** importado fallaba con "amount must be greater
+   than zero" — se corrige tomando `amount.value.abs()` al mapear.
+2. **Ventana de fecha por defecto**: `GET /v1/api/records` aplica automáticamente un filtro de los
+   últimos 3 meses (`appliedRecordDateFilters` en la respuesta) si no se manda `recordDate`
+   explícito — no es el parámetro `fromDate` que se había asumido, sino `recordDate` con sintaxis de
+   operador (`gte.`/`gt.`/`lt.`/`lte.`/`eq.`, ej. `recordDate=gte.2024-01-01T00:00:00Z`), documentado
+   en el OpenAPI pero no leído con suficiente cuidado la primera vez. Se corrige mandando siempre un
+   `recordDate=gte.<cursor o 2000-01-01 si es una corrida nueva>` explícito.
+3. **Formas anidadas no documentadas en el research.md original**: `category` en un `Record` es un
+   objeto anidado (`category.id`), no un `categoryId` plano; `labels` es un array de objetos
+   `{id, name, color, archived}` (se usa `.name`), no un array de strings; `transfer` no tiene un
+   `id` propio — el id útil para trazabilidad es `transfer.mirrorRecord.id` (el movimiento espejo del
+   otro lado de la transferencia); y `initialBalance.currencyCode` de una cuenta vive anidado, no
+   como `currencyCode` a nivel raíz. Además, las tres listas (`accounts`/`categories`/`records`)
+   vienen paginadas y envueltas en un objeto (`{"accounts": [...], "limit":..., "offset":...}`), no
+   como array plano — el primer intento asumía un array directo y fallaba con
+   `MismatchedInputException` en la primera llamada real.
+
+**Rationale de la corrección**: se detectaron recién al ejecutar T033 contra una cuenta de Wallet
+real con datos reales (19 cuentas, 96 categorías, movimientos históricos) — el fallback
+`@JsonIgnoreProperties(ignoreUnknown = true)` ya presente evitó que campos no mapeados rompieran el
+parseo, pero no puede inventar la forma correcta de un campo que sí se necesita. Queda como lección
+para features futuras que integren APIs externas: preferir leer el OpenAPI completo (o probar con un
+token real) antes de asumir formas de respuesta, en vez de derivarlas solo de la descripción textual
+de los endpoints.

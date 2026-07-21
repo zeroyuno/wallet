@@ -185,9 +185,11 @@ coincidir exactamente con lo que había en la cuenta de Wallet usada.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T032 Verificar cobertura JaCoCo >80% en `domain`/`application` de `walletimport`
-- [ ] T033 [P] Correr los 6 escenarios de `quickstart.md` manualmente contra la API real de
-      BudgetBakers Wallet, con datos de prueba propios en una cuenta de Wallet real (pendiente: requiere
-      un token real de Wallet, no disponible en este entorno — ver nota en WalletApiHttpClient.java)
+- [X] T033 [P] Correr los 6 escenarios de `quickstart.md` manualmente contra la API real de
+      BudgetBakers Wallet, con datos de prueba propios en una cuenta de Wallet real. Corrido por el
+      usuario contra su cuenta real (19 cuentas, 96 categorías, historial de movimientos desde
+      2025-02) — encontró y permitió corregir 3 bugs reales de mapeo (ver research.md #8: signo del
+      monto, ventana de fecha por defecto, formas anidadas de category/labels/transfer)
 - [X] T034 Revisar que los mensajes de `ImportError` sean legibles para el usuario (sin detalles
       técnicos), consistente con el resto de la app
 
