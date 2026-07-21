@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -255,7 +256,7 @@ class TransactionServiceTest {
 
         TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
         UUID id = service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(),
-                "Super", accountId, categoryId);
+                "Super", accountId, categoryId, null, null, null, null, Set.of());
 
         assertThat(id).isNotNull();
     }
@@ -271,7 +272,7 @@ class TransactionServiceTest {
 
         TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
         UUID id = service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(),
-                null, accountId, categoryId);
+                null, accountId, categoryId, null, null, null, null, Set.of());
 
         assertThat(id).isNotNull();
         org.mockito.ArgumentCaptor<Transaction> captor = org.mockito.ArgumentCaptor.forClass(Transaction.class);
@@ -286,7 +287,28 @@ class TransactionServiceTest {
         TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
 
         assertThatThrownBy(() -> service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"),
-                LocalDate.now(), null, accountId, null))
+                LocalDate.now(), null, accountId, null, null, null, null, null, Set.of()))
                 .isInstanceOf(InvalidTransactionAccountException.class);
+    }
+
+    // El resto de los campos propios de Wallet (counterParty/paymentType/recordState/
+    // walletTransferId/labels) deben quedar en la Transaction guardada tal como llegan.
+    @Test
+    void createFromExternalImportPersistsAllWalletOnlyFields() {
+        when(accountService.existsOwnedByUser(userId, accountId)).thenReturn(true);
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(), "Nota",
+                accountId, null, "Starbucks", "CARD", "CONFIRMED", "wallet-transfer-1", Set.of("viaje", "trabajo"));
+
+        org.mockito.ArgumentCaptor<Transaction> captor = org.mockito.ArgumentCaptor.forClass(Transaction.class);
+        org.mockito.Mockito.verify(transactionRepository).save(captor.capture());
+        Transaction saved = captor.getValue();
+        assertThat(saved.counterParty()).contains("Starbucks");
+        assertThat(saved.paymentType()).contains("CARD");
+        assertThat(saved.recordState()).contains("CONFIRMED");
+        assertThat(saved.walletTransferId()).contains("wallet-transfer-1");
+        assertThat(saved.labels()).containsExactlyInAnyOrder("viaje", "trabajo");
     }
 }

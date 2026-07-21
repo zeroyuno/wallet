@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -97,8 +98,12 @@ public class TransactionService {
     // (mismo criterio que accountService/categoryService, ver research.md de la feature 005).
     // A diferencia de create(), si la categoría no coincide en tipo no falla toda la operación:
     // el movimiento se importa igual pero sin esa categoría (research.md #3, limitación aceptada).
+    // counterParty/paymentType/recordState/walletTransferId/labels: campos propios de Wallet sin
+    // equivalente en el resto de la app, solo poblados al importar (ver Transaction.create overload).
     public UUID createFromExternalImport(UUID userId, String transactionTypeName, BigDecimal amount,
-                                          LocalDate date, String description, UUID accountId, UUID categoryId) {
+                                          LocalDate date, String description, UUID accountId, UUID categoryId,
+                                          String counterParty, String paymentType, String recordState,
+                                          String walletTransferId, Set<String> labels) {
         validateAccount(userId, accountId);
         TransactionType type = TransactionType.valueOf(transactionTypeName);
 
@@ -111,7 +116,7 @@ public class TransactionService {
         }
 
         Transaction transaction = Transaction.create(Optional.empty(), userId, type, amount, date, description,
-                accountId, resolvedCategoryId);
+                accountId, resolvedCategoryId, counterParty, paymentType, recordState, walletTransferId, labels);
         return transactionRepository.save(transaction).id().value();
     }
 
@@ -136,6 +141,8 @@ public class TransactionService {
     private static TransactionView toView(Transaction transaction) {
         return new TransactionView(transaction.id().value(), transaction.type(), transaction.amount(),
                 transaction.date(), transaction.description().orElse(null), transaction.accountId(),
-                transaction.categoryId().orElse(null));
+                transaction.categoryId().orElse(null), transaction.counterParty().orElse(null),
+                transaction.paymentType().orElse(null), transaction.recordState().orElse(null),
+                transaction.walletTransferId().orElse(null), transaction.labels());
     }
 }

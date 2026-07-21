@@ -99,6 +99,7 @@ public class TransactionController {
 
     private static TransactionResponse toResponse(TransactionView view) {
         return new TransactionResponse(view.id(), view.type(), view.amount(), view.date(), view.description(),
-                view.accountId(), view.categoryId());
+                view.accountId(), view.categoryId(), view.counterParty(), view.paymentType(), view.recordState(),
+                view.walletTransferId(), view.labels());
     }
 }

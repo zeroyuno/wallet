@@ -116,3 +116,28 @@ termine.
 **Rationale**: cumple con que el usuario pueda consultar el progreso (US3) sin bloquear el request que
 inicia la importación, con la herramienta más simple ya disponible en el framework — ver Complexity
 Tracking en plan.md para por qué se descarta un sistema de colas dedicado.
+
+## 8. Captura de todos los campos de `Record` (excepto `photos` y `place`)
+
+**Decision**: ampliación posterior al alcance inicial — se guardan todos los campos de `Record` salvo
+`photos` (adjuntos) y `place` (ubicación), explícitamente excluidos. `counterParty` pasa a tener su
+propia columna en `transactions` (antes se fusionaba con `note` en `description`); `paymentType` y
+`recordState` se guardan tal cual, como texto crudo de Wallet, sin mapear a un enum propio ni tener
+comportamiento asociado todavía; `transfer` se guarda como `walletTransferId` (el id crudo de Wallet),
+sin modelar una relación de transferencia real entre dos movimientos propios; `labels` se guardan en
+una tabla nueva `labels` (única por `user_id`+`name`, reutilizable entre transacciones) más una tabla
+puente `transaction_labels`, en vez de un campo de texto simple.
+
+**Rationale**: el usuario pidió explícitamente conservar el máximo de información posible del
+histórico de Wallet. Guardar `paymentType`/`recordState`/`walletTransferId` "tal cual" (sin mapear)
+evita inventar un enum o una relación propia sin un caso de uso concreto todavía (YAGNI) mientras
+igual preserva el dato para el futuro. `labels` sí se modela con una tabla relacional propia (en vez
+de texto plano) porque Wallet permite reutilizar la misma etiqueta en varios movimientos y eso es
+consultable/filtrable a futuro sin necesitar otra migración.
+
+**Alternatives considered**: mantener `counterParty` fusionado en `description` — rechazado porque el
+usuario pidió expresamente preservar el campo por separado. Modelar `transfer` como una relación real
+entre dos transacciones — rechazado por ahora: requeriría detectar y vincular ambos movimientos del
+par, un cambio de mayor alcance que la spec original de transferencias (`Assumptions` de spec.md:
+"transfers as two movements" independientes) no contemplaba; guardar el id crudo cumple con no perder
+el dato sin ese rediseño.

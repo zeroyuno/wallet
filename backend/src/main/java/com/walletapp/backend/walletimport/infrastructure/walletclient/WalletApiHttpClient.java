@@ -97,8 +97,11 @@ class WalletApiHttpClient implements WalletImportGateway {
 
     private static WalletRecordDto toDto(WalletApiRecord record) {
         BigDecimal amount = record.amount() == null ? BigDecimal.ZERO : record.amount().value();
+        String transferId = record.transfer() == null ? null : record.transfer().id();
+        List<String> labels = record.labels() == null ? List.of() : List.of(record.labels());
         return new WalletRecordDto(record.id(), record.accountId(), amount, record.recordDate(),
-                record.recordType(), record.categoryId(), record.counterParty(), record.note());
+                record.recordType(), record.categoryId(), record.counterParty(), record.note(),
+                record.paymentType(), record.recordState(), transferId, labels);
     }
 
     private record WalletApiMoney(BigDecimal value, String currencyCode) {
@@ -114,7 +117,15 @@ class WalletApiHttpClient implements WalletImportGateway {
     private record WalletApiCategory(String id, String name, String parentId, WalletApiGroup group) {
     }
 
+    // paymentType/recordState/labels: nombres de campo tomados literalmente del OpenAPI de Wallet.
+    // transfer: se asume un objeto con `id` (mismo patrón que `group` en categorías) — no verificado
+    // contra la API real todavía (pendiente T033 de tasks.md), documentado también en research.md.
+    private record WalletApiTransferRef(String id) {
+    }
+
     private record WalletApiRecord(String id, String accountId, WalletApiMoney amount, LocalDate recordDate,
-                                    String recordType, String categoryId, String counterParty, String note) {
+                                    String recordType, String categoryId, String counterParty, String note,
+                                    String paymentType, String recordState, WalletApiTransferRef transfer,
+                                    String[] labels) {
     }
 }

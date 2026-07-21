@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,14 +62,14 @@ class ImportProcessorTest {
                 .thenReturn(UUID.randomUUID());
         when(categoryService.createFromExternalImport(eq(userId), anyString(), anyString()))
                 .thenReturn(UUID.randomUUID());
-        when(transactionService.createFromExternalImport(eq(userId), anyString(), any(), any(), any(), any(), any()))
-                .thenReturn(UUID.randomUUID());
+        when(transactionService.createFromExternalImport(eq(userId), anyString(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any())).thenReturn(UUID.randomUUID());
 
         FakeWalletImportGateway gateway = new FakeWalletImportGateway()
                 .withAccounts(new WalletAccountDto("acc-1", "Efectivo", "Cash", "USD", new BigDecimal("100")))
                 .withCategories(new WalletCategoryDto("cat-1", "Comida", null, null))
                 .withRecords(new WalletRecordDto("rec-1", "acc-1", new BigDecimal("30"), LocalDate.now(),
-                        "EXPENSE", "cat-1", "Super", null));
+                        "EXPENSE", "cat-1", "Super", null, "CARD", "CONFIRMED", null, List.of("viaje")));
 
         ImportProcessor processor = new ImportProcessor(importRepository, externalReferenceRepository, gateway,
                 accountService, categoryService, transactionService);
@@ -143,13 +144,13 @@ class ImportProcessorTest {
         imp.advanceToTransactions();
         when(importRepository.findById(imp.id())).thenReturn(Optional.of(imp));
         externalReferenceRepository.save(userId, ExternalEntityType.ACCOUNT, "acc-1", UUID.randomUUID());
-        when(transactionService.createFromExternalImport(eq(userId), anyString(), any(), any(), any(), any(), any()))
-                .thenReturn(UUID.randomUUID());
+        when(transactionService.createFromExternalImport(eq(userId), anyString(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any())).thenReturn(UUID.randomUUID());
 
         FakeWalletImportGateway gateway = new FakeWalletImportGateway()
                 .withAccounts(new WalletAccountDto("acc-1", "Efectivo", "Cash", "USD", new BigDecimal("100")))
                 .withRecords(new WalletRecordDto("rec-1", "acc-1", new BigDecimal("30"), LocalDate.now(),
-                        "EXPENSE", null, null, "Nota"));
+                        "EXPENSE", null, null, "Nota", null, null, null, List.of()));
 
         ImportProcessor processor = new ImportProcessor(importRepository, externalReferenceRepository, gateway,
                 accountService, categoryService, transactionService);

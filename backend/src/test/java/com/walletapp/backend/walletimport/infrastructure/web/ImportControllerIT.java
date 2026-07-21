@@ -56,7 +56,8 @@ class ImportControllerIT {
                             new BigDecimal("100")))
                     .withCategories(new WalletCategoryDto("cat-1", "Comida", null, null))
                     .withRecords(new WalletRecordDto("rec-1", "acc-1", new BigDecimal("30"), LocalDate.now(),
-                            "EXPENSE", "cat-1", "Supermercado", null));
+                            "EXPENSE", "cat-1", "Supermercado", null, "CARD", "CONFIRMED", null,
+                            java.util.List.of("mercado")));
         }
     }
 

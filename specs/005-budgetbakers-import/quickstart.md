@@ -36,8 +36,9 @@ curl -s http://localhost:8080/api/transactions -H "Authorization: Bearer $TOKEN"
 ```
 
 Esperado: cada movimiento de la cuenta de Wallet de prueba aparece con el mismo monto, fecha y tipo
-(ingreso/gasto); si tenía categoría y/o counterParty/nota, quedan reflejados en la categoría asociada y
-en la descripción respectivamente.
+(ingreso/gasto); la categoría queda asociada si tenía una, `description` refleja la `note` de Wallet, y
+`counterParty`/`paymentType`/`recordState`/`walletTransferId`/`labels` aparecen en la respuesta tal
+cual venían en Wallet (todos los campos de `Record` excepto `photos` y `place`, ver data-model.md).
 
 ### 3. Correr la importación dos veces no duplica nada (FR-006, SC-003)
 

@@ -18,8 +18,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.walletapp.backend.walletimport.domain.ExternalEntityType.ACCOUNT;
@@ -165,9 +167,10 @@ class ImportProcessor {
             UUID categoryId = dto.categoryId() == null ? null
                     : externalReferenceRepository.findInternalId(imp.userId(), CATEGORY, dto.categoryId())
                             .orElse(null);
-            String description = joinDescription(dto.counterParty(), dto.note());
+            Set<String> labels = dto.labels() == null ? Set.of() : new LinkedHashSet<>(dto.labels());
             UUID internalId = transactionService.createFromExternalImport(imp.userId(), dto.recordType().toUpperCase(),
-                    dto.amount(), dto.recordDate(), description, accountId, categoryId);
+                    dto.amount(), dto.recordDate(), dto.note(), accountId, categoryId, dto.counterParty(),
+                    dto.paymentType(), dto.recordState(), dto.transferId(), labels);
             externalReferenceRepository.save(imp.userId(), TRANSACTION, dto.id(), internalId);
             imp.recordTransactionImported();
         } catch (RuntimeException e) {
@@ -185,17 +188,5 @@ class ImportProcessor {
             case "CreditCard" -> "CREDIT_CARD";
             default -> "OTHER";
         };
-    }
-
-    private static String joinDescription(String counterParty, String note) {
-        boolean hasCounterParty = counterParty != null && !counterParty.isBlank();
-        boolean hasNote = note != null && !note.isBlank();
-        if (hasCounterParty && hasNote) {
-            return counterParty + " — " + note;
-        }
-        if (hasCounterParty) {
-            return counterParty;
-        }
-        return hasNote ? note : null;
     }
 }

@@ -40,8 +40,25 @@ Restricción única: (`userId`, `entityType`, `externalId`).
 
 - `WalletAccountDto`: `id`, `name`, `accountType` (String), `currencyCode`, `initialBalance`.
 - `WalletCategoryDto`: `id`, `name`, `parentId` (nullable), `groupId` (nullable, de `group.id`).
-- `WalletRecordDto`: `id`, `accountId`, `amount` (BigDecimal), `currencyCode`, `recordDate`,
-  `recordType` (income/expense), `categoryId` (nullable), `counterParty` (nullable), `note` (nullable).
+- `WalletRecordDto`: `id`, `accountId`, `amount` (BigDecimal), `recordDate`, `recordType`
+  (income/expense), `categoryId` (nullable), `counterParty` (nullable), `note` (nullable),
+  `paymentType` (nullable), `recordState` (nullable), `transferId` (nullable, de `transfer.id`),
+  `labels` (lista de String). Se guardan todos los campos de `Record` **excepto** `photos` y `place`
+  (decisión explícita, ver Assumptions de spec.md).
+
+## `Transaction` — campos adicionales solo poblados al importar (contexto `transaction`)
+
+Extiende el modelo ya existente de la feature 003. Estos campos son de solo lectura desde la API
+propia (no editables vía `PUT /api/transactions/{id}`) y quedan `null`/vacíos en una transacción
+creada manualmente:
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `counterParty` | String, nullable | Nombre de la contraparte (comercio/persona) tal cual viene de Wallet — columna propia, ya no se fusiona con `note`. |
+| `paymentType` | String, nullable | Valor crudo de Wallet, sin mapear a un enum propio. |
+| `recordState` | String, nullable | Valor crudo de Wallet (sin equivalente ni comportamiento propio todavía). |
+| `walletTransferId` | String, nullable | Id crudo de la transferencia en Wallet — no se modela una relación de transferencia propia (ver Alternatives). |
+| `labels` | Set\<String\> | Vía tabla `labels` (`id`, `user_id`, `name`, único por usuario+nombre) + `transaction_labels` (muchos a muchos) — se reutiliza la etiqueta si ya existe para ese usuario. |
 
 ## API propia — request/response
 
@@ -49,6 +66,8 @@ Restricción única: (`userId`, `entityType`, `externalId`).
   durante la corrida).
 - `ImportResponse`: `id`, `status`, `accountsImported`, `categoriesImported`, `transactionsImported`,
   `errors` (lista de `{entityType, externalId, reason}`), `startedAt`, `lastActivityAt`.
+- `TransactionResponse` (feature 003, ampliada): agrega `counterParty`, `paymentType`, `recordState`,
+  `walletTransferId`, `labels` — visibles también para transacciones no importadas (quedan `null`/vacíos).
 
 ## Reglas de mapeo (resumen, detalle en research.md)
 
@@ -58,5 +77,6 @@ Restricción única: (`userId`, `entityType`, `externalId`).
   pasada (research.md #4).
 - Movimiento: `type` = `recordType` de Wallet directo (mismo vocabulario ingreso/gasto); `amount` =
   `amount.value`; `date` = `recordDate`; `accountId`/`categoryId` resueltos vía `ImportExternalRef`;
-  `description` = `counterParty` y `note` concatenados (el que esté presente; si ambos, separados por
-  " — ").
+  `description` = `note` de Wallet tal cual (ya no incluye `counterParty`, que ahora tiene su propia
+  columna); `counterParty`/`paymentType`/`recordState`/`walletTransferId`/`labels` se copian tal cual
+  (research.md #8).
