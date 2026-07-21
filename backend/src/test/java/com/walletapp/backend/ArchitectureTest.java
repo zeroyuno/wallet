@@ -19,7 +19,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class ArchitectureTest {
 
     // Agregar acá el nombre de paquete de cada bounded context nuevo (ej. "account").
-    private static final List<String> BOUNDED_CONTEXTS = List.of("auth", "account", "transaction");
+    private static final List<String> BOUNDED_CONTEXTS = List.of("auth", "account", "transaction", "walletimport");
 
     @ArchTest
     static final ArchRule domain_should_not_depend_on_frameworks =

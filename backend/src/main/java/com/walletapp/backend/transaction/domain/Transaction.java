@@ -3,8 +3,11 @@ package com.walletapp.backend.transaction.domain;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class Transaction {
@@ -18,9 +21,18 @@ public final class Transaction {
     private final UUID accountId;
     private UUID categoryId;
     private final Instant createdAt;
+    // Campos de solo lectura poblados al importar desde BudgetBakers Wallet (feature 005) — no
+    // editables vía update(), ausentes (null/vacío) en una transacción creada manualmente.
+    private final String counterParty;
+    private final String paymentType;
+    private final String recordState;
+    private final String walletTransferId;
+    private final Set<String> labels;
 
     private Transaction(TransactionId id, UUID userId, TransactionType type, BigDecimal amount, LocalDate date,
-                         String description, UUID accountId, UUID categoryId, Instant createdAt) {
+                         String description, UUID accountId, UUID categoryId, Instant createdAt,
+                         String counterParty, String paymentType, String recordState, String walletTransferId,
+                         Set<String> labels) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -30,6 +42,11 @@ public final class Transaction {
         this.accountId = accountId;
         this.categoryId = categoryId;
         this.createdAt = createdAt;
+        this.counterParty = counterParty;
+        this.paymentType = paymentType;
+        this.recordState = recordState;
+        this.walletTransferId = walletTransferId;
+        this.labels = new LinkedHashSet<>(labels);
     }
 
     // id es opcional: si el cliente lo provee (creación offline, FR-011) se usa tal cual; si no,
@@ -37,16 +54,30 @@ public final class Transaction {
     public static Transaction create(Optional<TransactionId> id, UUID userId, TransactionType type,
                                       BigDecimal amount, LocalDate date, String description, UUID accountId,
                                       UUID categoryId) {
+        return create(id, userId, type, amount, date, description, accountId, categoryId, null, null, null, null,
+                Set.of());
+    }
+
+    // Variante usada por la importación desde Wallet (feature 005): además de los campos propios,
+    // captura counterParty/paymentType/recordState/walletTransferId/labels tal como vienen de Wallet
+    // (ver research.md e ImportProcessor) — el resto de la app no los setea ni los edita.
+    public static Transaction create(Optional<TransactionId> id, UUID userId, TransactionType type,
+                                      BigDecimal amount, LocalDate date, String description, UUID accountId,
+                                      UUID categoryId, String counterParty, String paymentType, String recordState,
+                                      String walletTransferId, Set<String> labels) {
         requirePositiveAmount(amount);
         requireNonNull(date, "date");
         return new Transaction(id.orElseGet(TransactionId::newId), userId, type, amount, date, description,
-                accountId, categoryId, Instant.now());
+                accountId, categoryId, Instant.now(), counterParty, paymentType, recordState, walletTransferId,
+                labels == null ? Set.of() : labels);
     }
 
     public static Transaction reconstitute(TransactionId id, UUID userId, TransactionType type, BigDecimal amount,
                                             LocalDate date, String description, UUID accountId, UUID categoryId,
-                                            Instant createdAt) {
-        return new Transaction(id, userId, type, amount, date, description, accountId, categoryId, createdAt);
+                                            Instant createdAt, String counterParty, String paymentType,
+                                            String recordState, String walletTransferId, Set<String> labels) {
+        return new Transaction(id, userId, type, amount, date, description, accountId, categoryId, createdAt,
+                counterParty, paymentType, recordState, walletTransferId, labels == null ? Set.of() : labels);
     }
 
     // type y accountId son inmutables tras la creación (FR-005, ver research.md).
@@ -105,6 +136,26 @@ public final class Transaction {
 
     public Instant createdAt() {
         return createdAt;
+    }
+
+    public Optional<String> counterParty() {
+        return Optional.ofNullable(counterParty);
+    }
+
+    public Optional<String> paymentType() {
+        return Optional.ofNullable(paymentType);
+    }
+
+    public Optional<String> recordState() {
+        return Optional.ofNullable(recordState);
+    }
+
+    public Optional<String> walletTransferId() {
+        return Optional.ofNullable(walletTransferId);
+    }
+
+    public Set<String> labels() {
+        return Collections.unmodifiableSet(labels);
     }
 
     @Override

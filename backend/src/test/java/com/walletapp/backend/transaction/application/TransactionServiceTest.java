@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -244,5 +245,70 @@ class TransactionServiceTest {
 
         assertThatThrownBy(() -> service.delete(userId, TransactionId.newId()))
                 .isInstanceOf(com.walletapp.backend.transaction.domain.exception.TransactionNotFoundException.class);
+    }
+
+    @Test
+    void createFromExternalImportCreatesTransactionWithMatchingCategory() {
+        UUID categoryId = UUID.randomUUID();
+        when(accountService.existsOwnedByUser(userId, accountId)).thenReturn(true);
+        when(categoryService.findTypeIfOwnedByUser(userId, categoryId)).thenReturn(Optional.of("EXPENSE"));
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        UUID id = service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(),
+                "Super", accountId, categoryId, null, null, null, null, Set.of());
+
+        assertThat(id).isNotNull();
+    }
+
+    // research.md #3: si el tipo de la categoría no coincide, se importa igual pero sin categoría,
+    // en vez de fallar toda la importación de ese movimiento.
+    @Test
+    void createFromExternalImportDropsCategoryOnTypeMismatchInsteadOfFailing() {
+        UUID categoryId = UUID.randomUUID();
+        when(accountService.existsOwnedByUser(userId, accountId)).thenReturn(true);
+        when(categoryService.findTypeIfOwnedByUser(userId, categoryId)).thenReturn(Optional.of("INCOME"));
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        UUID id = service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(),
+                null, accountId, categoryId, null, null, null, null, Set.of());
+
+        assertThat(id).isNotNull();
+        org.mockito.ArgumentCaptor<Transaction> captor = org.mockito.ArgumentCaptor.forClass(Transaction.class);
+        org.mockito.Mockito.verify(transactionRepository).save(captor.capture());
+        assertThat(captor.getValue().categoryId()).isEmpty();
+    }
+
+    @Test
+    void createFromExternalImportRejectsAccountNotOwnedByUser() {
+        when(accountService.existsOwnedByUser(any(), any())).thenReturn(false);
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+
+        assertThatThrownBy(() -> service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"),
+                LocalDate.now(), null, accountId, null, null, null, null, null, Set.of()))
+                .isInstanceOf(InvalidTransactionAccountException.class);
+    }
+
+    // El resto de los campos propios de Wallet (counterParty/paymentType/recordState/
+    // walletTransferId/labels) deben quedar en la Transaction guardada tal como llegan.
+    @Test
+    void createFromExternalImportPersistsAllWalletOnlyFields() {
+        when(accountService.existsOwnedByUser(userId, accountId)).thenReturn(true);
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        service.createFromExternalImport(userId, "EXPENSE", new BigDecimal("30"), LocalDate.now(), "Nota",
+                accountId, null, "Starbucks", "CARD", "CONFIRMED", "wallet-transfer-1", Set.of("viaje", "trabajo"));
+
+        org.mockito.ArgumentCaptor<Transaction> captor = org.mockito.ArgumentCaptor.forClass(Transaction.class);
+        org.mockito.Mockito.verify(transactionRepository).save(captor.capture());
+        Transaction saved = captor.getValue();
+        assertThat(saved.counterParty()).contains("Starbucks");
+        assertThat(saved.paymentType()).contains("CARD");
+        assertThat(saved.recordState()).contains("CONFIRMED");
+        assertThat(saved.walletTransferId()).contains("wallet-transfer-1");
+        assertThat(saved.labels()).containsExactlyInAnyOrder("viaje", "trabajo");
     }
 }

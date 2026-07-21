@@ -113,4 +113,15 @@ class AccountServiceTest {
                 .contains(new BigDecimal("42"));
         assertThat(service.getInitialBalanceIfOwnedByUser(UUID.randomUUID(), account.id().value())).isEmpty();
     }
+
+    @Test
+    void createFromExternalImportCreatesAccountAndReturnsItsId() {
+        when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AccountService service = new AccountService(accountRepository);
+        UUID id = service.createFromExternalImport(userId, "Efectivo Wallet", "CASH", "USD",
+                new BigDecimal("50"));
+
+        assertThat(id).isNotNull();
+    }
 }

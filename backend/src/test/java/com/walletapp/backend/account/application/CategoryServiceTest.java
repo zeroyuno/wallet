@@ -141,4 +141,41 @@ class CategoryServiceTest {
                 new CategoryCommand("Comida", CategoryType.EXPENSE, parent.id().value())))
                 .isInstanceOf(InvalidCategoryHierarchyException.class);
     }
+
+    @Test
+    void createFromExternalImportCreatesCategoryWithoutParent() {
+        when(categoryRepository.existsByUserIdAndTypeAndName(any(), any(), any())).thenReturn(false);
+        when(categoryRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CategoryService service = new CategoryService(categoryRepository);
+        UUID id = service.createFromExternalImport(userId, "Comida Wallet", "EXPENSE");
+
+        assertThat(id).isNotNull();
+    }
+
+    @Test
+    void createFromExternalImportRejectsDuplicateNameAndType() {
+        when(categoryRepository.existsByUserIdAndTypeAndName(userId, CategoryType.EXPENSE, "Comida"))
+                .thenReturn(true);
+
+        CategoryService service = new CategoryService(categoryRepository);
+
+        assertThatThrownBy(() -> service.createFromExternalImport(userId, "Comida", "EXPENSE"))
+                .isInstanceOf(DuplicateCategoryException.class);
+    }
+
+    @Test
+    void setParentCategoryIfOwnedByUserAssignsParent() {
+        Category parent = Category.create(userId, "Comida", CategoryType.EXPENSE, null);
+        Category child = Category.create(userId, "Supermercado", CategoryType.EXPENSE, null);
+        when(categoryRepository.findByIdAndUserId(child.id(), userId)).thenReturn(Optional.of(child));
+        when(categoryRepository.findByIdAndUserId(parent.id(), userId)).thenReturn(Optional.of(parent));
+        when(categoryRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CategoryService service = new CategoryService(categoryRepository);
+        service.setParentCategoryIfOwnedByUser(userId, child.id().value(), parent.id().value());
+
+        verify(categoryRepository).save(child);
+        assertThat(child.parentCategoryId()).contains(parent.id());
+    }
 }

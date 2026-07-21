@@ -4,6 +4,7 @@ import com.walletapp.backend.transaction.domain.TransactionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 
 public record TransactionResponse(
@@ -13,5 +14,10 @@ public record TransactionResponse(
         LocalDate date,
         String description,
         UUID accountId,
-        UUID categoryId) {
+        UUID categoryId,
+        String counterParty,
+        String paymentType,
+        String recordState,
+        String walletTransferId,
+        Set<String> labels) {
 }
