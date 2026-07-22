@@ -161,6 +161,36 @@ class ImportProcessorTest {
         assertThat(imp.transactionsImported()).isEqualTo(1);
     }
 
+    // Regresión: Wallet devuelve los movimientos del más nuevo al más viejo. Si el filtro de fecha
+    // se recalcula en cada página a partir del cursor (que va bajando página a página), termina
+    // excluyendo justo los movimientos más viejos que todavía faltan traer — cortando la
+    // importación mucho antes del historial completo. Acá se simulan más de una página (150
+    // movimientos, RECORDS_PAGE_SIZE=100) con fechas descendentes, como en la API real.
+    @Test
+    void importsAllPagesOfTransactionsWithDescendingDatesWithoutTighteningTheDateFilter() {
+        Import imp = Import.create(userId);
+        imp.advanceToCategories();
+        imp.advanceToTransactions();
+        when(importRepository.findById(imp.id())).thenReturn(Optional.of(imp));
+        externalReferenceRepository.save(userId, ExternalEntityType.ACCOUNT, "acc-1", UUID.randomUUID());
+        when(transactionService.createFromExternalImport(eq(userId), anyString(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any())).thenReturn(UUID.randomUUID());
+
+        FakeWalletImportGateway gateway = new FakeWalletImportGateway();
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < 150; i++) {
+            gateway.withRecords(new WalletRecordDto("rec-" + i, "acc-1", new BigDecimal("10"),
+                    today.minusDays(i), "EXPENSE", null, null, null, null, null, null, List.of()));
+        }
+
+        ImportProcessor processor = new ImportProcessor(importRepository, externalReferenceRepository, gateway,
+                accountService, categoryService, transactionService);
+        processor.run(imp.id().value(), "token");
+
+        assertThat(imp.status()).isEqualTo(ImportStatus.COMPLETED);
+        assertThat(imp.transactionsImported()).isEqualTo(150);
+    }
+
     private static class InMemoryExternalReferenceRepository implements ExternalReferenceRepository {
         private final Map<String, UUID> store = new HashMap<>();
 

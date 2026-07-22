@@ -99,6 +99,23 @@ abierto (o el hilo async ocupado) por potencialmente más de una hora; es más s
 y dejar que una corrida posterior (iniciada por el usuario o reintentada automáticamente más tarde)
 continúe.
 
+**Bug real encontrado en producción (post-T033) y corregido**: la decisión de arriba asumía
+implícitamente que los movimientos vienen ordenados del más viejo al más nuevo (para que el cursor
+funcione como un piso `gte` que solo crece). La API real de Wallet devuelve los movimientos del más
+**nuevo** al más viejo. La primera implementación de `ImportProcessor.importTransactions` releía
+`imp.cursorRecordDate()` en cada página del `while` — como el cursor se actualiza con la fecha de
+cada registro procesado (terminando en la más vieja del lote, por el orden de recorrido), cada página
+subsecuente pedía un `recordDate=gte.<piso cada vez más alto>`, excluyendo exactamente los movimientos
+más viejos que todavía faltaban traer. En la práctica, una cuenta con años de historial solo importaba
+la primera página o dos (los movimientos más recientes) y se detenía ahí sin ningún error visible —
+`status` quedaba en `COMPLETED` igual, dando una falsa sensación de que la importación estaba completa.
+**Fix**: el `fromDate` efectivo se calcula una sola vez al principio de `importTransactions` (a partir
+del cursor de reanudación si lo hay) y se mantiene fijo durante toda la corrida — solo el `offset`
+avanza entre páginas. El cursor persistido sigue actualizándose por bookkeeping (para que una corrida
+interrumpida por rate limit tenga de dónde reanudar), pero ya no se vuelve a leer dentro del mismo
+`while`. Cubierto por un test de regresión con 150 movimientos en fechas descendentes (más de una
+página) en `ImportProcessorTest`.
+
 ## 6. Mecanismo de idempotencia (FR-006)
 
 **Decision**: tabla `import_external_refs` (`user_id`, `entity_type` [ACCOUNT/CATEGORY/TRANSACTION],
