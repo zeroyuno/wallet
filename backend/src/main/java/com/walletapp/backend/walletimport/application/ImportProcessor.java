@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -143,11 +144,18 @@ class ImportProcessor {
     }
 
     private void importTransactions(Import imp, String walletApiToken) {
+        // Wallet devuelve los movimientos del más nuevo al más viejo. El filtro `recordDate` debe
+        // quedar FIJO durante toda la corrida (calculado una sola vez acá, al valor del cursor de
+        // reanudación si lo hay) — recalcularlo en cada página a partir de imp.cursorRecordDate()
+        // (que se va actualizando página a página con la fecha más vieja vista hasta el momento)
+        // termina subiendo el piso del filtro y excluye justo los movimientos más viejos que todavía
+        // faltan traer, cortando la importación mucho antes de llegar al historial completo.
+        LocalDate fromDate = imp.cursorRecordDate();
         int offset = 0;
         boolean hasMore = true;
         while (hasMore) {
-            WalletRecordPage page = walletImportGateway
-                    .fetchRecords(walletApiToken, imp.cursorRecordDate(), offset, RECORDS_PAGE_SIZE);
+            WalletRecordPage page = walletImportGateway.fetchRecords(walletApiToken, fromDate, offset,
+                    RECORDS_PAGE_SIZE);
             for (WalletRecordDto dto : page.records()) {
                 if (externalReferenceRepository.findInternalId(imp.userId(), TRANSACTION, dto.id()).isEmpty()) {
                     importOneTransaction(imp, dto);
