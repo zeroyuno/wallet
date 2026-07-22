@@ -242,7 +242,10 @@ resource backendApp 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 0
+        // minReplicas: 1 (no 0) — con scale-to-zero, el primer request tras estar inactivo dispara
+        // un cold start de ~40-80s que la mayoría de los clientes HTTP corta por timeout antes de
+        // que termine. Se prioriza disponibilidad sobre el ahorro de costo de escalar a cero.
+        minReplicas: 1
         maxReplicas: 1
       }
     }
