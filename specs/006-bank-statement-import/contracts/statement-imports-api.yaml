@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: Bank Statement Imports API
+  version: "1.0.0"
+  description: Contrato de la feature 006 (Importar movimientos desde estados de cuenta PDF). Todos
+    los endpoints requieren autenticación (JWT de la feature 001) y operan exclusivamente sobre los
+    datos del usuario autenticado.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/statement-imports:
+    post:
+      summary: Subir un PDF de estado de cuenta para una cuenta propia (FR-001, FR-002)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, accountId]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: El PDF del estado de cuenta.
+                accountId:
+                  type: string
+                  format: uuid
+                  description: Cuenta propia a la que pertenece este estado de cuenta.
+      responses:
+        "202":
+          description: Importación aceptada y corriendo en segundo plano
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatementImportResponse"
+        "400":
+          description: Archivo ausente/no es un PDF válido, o accountId ausente
+        "401":
+          description: Token JWT propio ausente, expirado o inválido
+        "404":
+          description: La cuenta indicada no existe o no pertenece al usuario autenticado (FR-002)
+
+  /api/statement-imports/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Consultar el estado y resultado de una importación de PDF propia (FR-007, US2)
+      responses:
+        "200":
+          description: Estado actual de la importación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatementImportResponse"
+        "404":
+          description: Importación no encontrada o no pertenece al usuario autenticado
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    StatementImportResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED, FAILED]
+        transactionsImported:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatementLineErrorResponse"
+        failureReason:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+    StatementLineErrorResponse:
+      type: object
+      properties:
+        rawText:
+          type: string
+        reason:
+          type: string
