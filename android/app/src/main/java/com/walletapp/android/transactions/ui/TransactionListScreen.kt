@@ -1,7 +1,9 @@
 package com.walletapp.android.transactions.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -27,7 +31,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -42,6 +48,7 @@ import com.walletapp.android.transactions.SyncUiState
 import com.walletapp.android.transactions.TransactionFilter
 import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.TransactionViewModel
+import java.util.Locale
 
 @Composable
 fun TransactionListScreen(
@@ -196,24 +203,55 @@ private fun TransactionRow(
     categoryName: String?,
     onClick: () -> Unit
 ) {
+    val isIncome = transaction.type == CategoryType.INCOME
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column {
-                Text(text = transaction.description?.takeIf { it.isNotBlank() } ?: transaction.type.displayLabel(), style = MaterialTheme.typography.titleMedium)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isIncome) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.errorContainer
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                // Sin androidx.compose.material:material-icons-extended (dependencia pesada solo
+                // para dos íconos) — una flecha como texto cumple el mismo rol visual.
+                Text(
+                    text = if (isIncome) "↓" else "↑",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+            }
+            // weight(1f) es lo que evita que un texto largo empuje el monto a un espacio casi nulo
+            // (el bug que hacía que el monto se partiera en una columna vertical, dígito por dígito).
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = transaction.description?.takeIf { it.isNotBlank() } ?: transaction.type.displayLabel(),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     text = listOfNotNull(accountName, categoryName, transaction.date).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            val isIncome = transaction.type == CategoryType.INCOME
             Text(
-                text = "${if (isIncome) "+" else "-"}${transaction.amount}",
+                text = "${if (isIncome) "+" else "-"}${
+                    String.format(Locale.getDefault(), "%.2f", transaction.amount)
+                }",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                maxLines = 1
             )
         }
     }
