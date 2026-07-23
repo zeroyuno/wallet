@@ -126,3 +126,29 @@ con datos reales, no con el fake usado en los tests automatizados):
    `ON DELETE CASCADE` (migración V8) — a diferencia de `import_external_refs` de la feature 005, acá
    sí es posible una FK simple porque `internal_transaction_id` siempre referencia `transactions`
    (nunca cuentas ni categorías, que la feature 006 no crea).
+
+## 8. Precisión del tipo ingreso/gasto: "mostrar el trabajo" + corrección determinística
+
+**Decision**: además de la instrucción de priorizar la columna (research.md #7.2), se agrega un campo
+obligatorio `source_column` al schema del tool-use — el modelo debe declarar, para cada movimiento, el
+texto literal del encabezado de columna donde vio el monto, ANTES de asignar `type`. Del lado del
+código, `AnthropicPdfExtractionClient` no confía ciegamente en el `type` que devuelve el modelo: si
+`source_column` matchea un término bancario conocido (abono/crédito/depósito → `INCOME`,
+cargo/débito/retiro → `EXPENSE`), esa columna decide el tipo final, no el juicio del modelo. Si
+`source_column` viene vacío (documento sin columnas separadas), se respeta el `type` que ya infirió el
+modelo por descripción.
+
+**Rationale**: validado con un PDF real (T026), la sola instrucción de "priorizá la columna" en el
+prompt no bastó — el modelo declaraba bien la columna en algunos casos y aun así asignaba el `type`
+contrario, sobre todo cuando la descripción "sonaba" al tipo opuesto (ej. "Pago YAPE de X" es un
+ingreso pese a que la palabra "Pago" sugiere gasto). Forzar un campo intermedio obligatorio
+(`source_column`) es una técnica de prompting conocida para mejorar precisión en extracción tabular
+(obliga al modelo a "mostrar el trabajo" fila por fila en vez de solo dar la conclusión); agregar
+además una corrección determinística en el código sobre ese campo es una capa de seguridad barata que
+no depende de que el modelo sea perfectamente consistente entre `source_column` y `type` en cada fila.
+
+**Alternatives considered**: quedarse solo con la instrucción de prompt sin el campo intermedio ni la
+corrección en código — insuficiente, es justo lo que falló en la validación manual. Confiar
+únicamente en la corrección por palabra clave sin pedirle al modelo que declare la columna — más
+frágil, porque dependería de que el código adivinara el nombre de columna sin que el modelo lo haya
+leído explícitamente del documento.

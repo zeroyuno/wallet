@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Adaptador hacia la API de Mensajes de Anthropic (research.md #1, #1b). Manda el PDF completo como
@@ -49,10 +50,11 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                     "properties": {
                       "date": {"type": "string", "description": "Fecha del movimiento, formato ISO 8601 YYYY-MM-DD"},
                       "amount": {"type": "number", "description": "Magnitud del monto, siempre positiva"},
-                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"]},
+                      "source_column": {"type": "string", "description": "Texto EXACTO del encabezado de la columna en la que aparece el monto de este movimiento en el documento (ej. 'Cargo', 'Abono', 'Débito', 'Crédito', 'Retiro', 'Depósito'). Dejar como string vacío si el documento no separa los movimientos en columnas de este tipo."},
+                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"], "description": "Si source_column no está vacío, DEBE ser consistente con esa columna (cargo/débito/retiro -> EXPENSE, abono/crédito/depósito -> INCOME). Si source_column está vacío, inferilo de la descripción."},
                       "description": {"type": "string", "description": "Descripción o concepto del movimiento"}
                     },
-                    "required": ["date", "amount", "type", "description"]
+                    "required": ["date", "amount", "source_column", "type", "description"]
                   }
                 },
                 "unparsed_lines": {
@@ -72,15 +74,20 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
             """;
 
     private static final String PROMPT = "Este PDF es un estado de cuenta bancario o de tarjeta de "
-            + "crédito. Identificá cada movimiento (fecha, monto, si es ingreso o gasto, y una "
-            + "descripción breve) y llamá a la herramienta " + TOOL_NAME + " con la lista completa. "
-            + "Para decidir si un movimiento es ingreso o gasto: si el documento tiene columnas "
-            + "separadas para cargos/débitos y abonos/créditos (o nombres equivalentes como "
-            + "'Retiro'/'Depósito', 'Débito'/'Crédito', 'Cargo'/'Abono'), usá SIEMPRE en qué columna "
-            + "aparece el monto — un monto en la columna de cargos/débitos es EXPENSE, uno en la "
-            + "columna de abonos/créditos es INCOME — sin importar lo que sugiera el texto de la "
-            + "descripción. Solo si el documento no separa los movimientos en columnas de este tipo, "
-            + "inferí el tipo a partir de la descripción. "
+            + "crédito. Identificá cada movimiento (fecha, monto, columna de origen, si es ingreso o "
+            + "gasto, y una descripción breve) y llamá a la herramienta " + TOOL_NAME + " con la lista "
+            + "completa. "
+            + "Para cada movimiento, ANTES de decidir el tipo, fijate en qué columna del documento "
+            + "aparece el monto y anotalo literalmente en source_column (ej. 'Cargo', 'Abono'). Recién "
+            + "después, con eso ya identificado, asigná el tipo: un monto en una columna de "
+            + "cargo/débito/retiro es EXPENSE, uno en abono/crédito/depósito es INCOME — esto vale "
+            + "SIEMPRE que el documento tenga esa separación en columnas, sin importar lo que sugiera "
+            + "el texto de la descripción (ej. una fila que dice \"Pago YAPE de X\" en la columna de "
+            + "abonos es INCOME, no EXPENSE, aunque la palabra \"Pago\" sugiera lo contrario). Prestá "
+            + "atención fila por fila: no asumas el tipo de una fila por otras filas con descripción "
+            + "parecida — cada una puede estar en una columna distinta. Solo si el documento no separa "
+            + "los movimientos en columnas de este tipo, dejá source_column vacío e inferí el tipo a "
+            + "partir de la descripción. "
             + "Si alguna línea no se puede interpretar con confianza suficiente (monto ambiguo, fecha "
             + "ilegible, etc.), incluila en unparsed_lines con el texto tal cual aparece y el motivo, "
             + "en vez de adivinar.";
@@ -145,10 +152,12 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
     private PdfExtractionResult toResult(JsonNode toolInput) {
         List<ExtractedTransactionDto> transactions = new ArrayList<>();
         for (JsonNode node : toolInput.path("transactions")) {
+            String modelType = node.path("type").asString();
+            String sourceColumn = node.path("source_column").asString("");
             transactions.add(new ExtractedTransactionDto(
                     LocalDate.parse(node.path("date").asString()),
                     new BigDecimal(node.path("amount").asString()),
-                    node.path("type").asString(),
+                    resolveType(modelType, sourceColumn),
                     node.path("description").asString()));
         }
         List<UnparsedLineDto> unparsedLines = new ArrayList<>();
@@ -156,6 +165,28 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
             unparsedLines.add(new UnparsedLineDto(node.path("raw_text").asString(), node.path("reason").asString()));
         }
         return new PdfExtractionResult(transactions, unparsedLines);
+    }
+
+    // Corrección determinística sobre el juicio del modelo (research.md #7, T026): a veces el
+    // modelo declara correctamente la columna en source_column pero igual asigna el type que no le
+    // corresponde (sobre todo cuando la descripción "suena" al tipo contrario, ej. "Pago YAPE de X"
+    // es un ingreso pese a la palabra "Pago"). Si la columna reportada matchea un término bancario
+    // conocido, esa columna manda sobre el type del modelo; si no matchea nada (documento sin
+    // columnas separadas), se respeta el type que ya infirió el modelo por descripción.
+    private static final Set<String> INCOME_COLUMN_KEYWORDS = Set.of("abono", "credito", "crédito", "deposito",
+            "depósito", "ingreso");
+    private static final Set<String> EXPENSE_COLUMN_KEYWORDS = Set.of("cargo", "debito", "débito", "retiro",
+            "egreso");
+
+    private static String resolveType(String modelType, String sourceColumn) {
+        String normalized = sourceColumn == null ? "" : sourceColumn.toLowerCase().trim();
+        if (INCOME_COLUMN_KEYWORDS.stream().anyMatch(normalized::contains)) {
+            return "INCOME";
+        }
+        if (EXPENSE_COLUMN_KEYWORDS.stream().anyMatch(normalized::contains)) {
+            return "EXPENSE";
+        }
+        return modelType;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
