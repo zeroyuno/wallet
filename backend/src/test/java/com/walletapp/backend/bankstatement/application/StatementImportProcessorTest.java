@@ -53,7 +53,7 @@ class StatementImportProcessorTest {
 
         FakePdfExtractionGateway gateway = new FakePdfExtractionGateway()
                 .withTransactions(new ExtractedTransactionDto(LocalDate.of(2026, 1, 15), new BigDecimal("50"),
-                        "EXPENSE", "Supermercado"));
+                        "EXPENSE", "Supermercado", ""));
 
         StatementImportProcessor processor = new StatementImportProcessor(statementImportRepository,
                 statementLineHashRepository, gateway, transactionService);
@@ -73,7 +73,7 @@ class StatementImportProcessorTest {
 
         FakePdfExtractionGateway gateway = new FakePdfExtractionGateway()
                 .withTransactions(new ExtractedTransactionDto(LocalDate.of(2026, 1, 15), new BigDecimal("50"),
-                        "EXPENSE", "Supermercado"))
+                        "EXPENSE", "Supermercado", ""))
                 .withUnparsedLines(new UnparsedLineDto("linea rara $???", "monto ilegible"));
 
         StatementImportProcessor processor = new StatementImportProcessor(statementImportRepository,
@@ -114,7 +114,7 @@ class StatementImportProcessorTest {
 
         FakePdfExtractionGateway gateway = new FakePdfExtractionGateway()
                 .withTransactions(new ExtractedTransactionDto(LocalDate.of(2026, 1, 15), new BigDecimal("50"),
-                        "EXPENSE", "Supermercado"));
+                        "EXPENSE", "Supermercado", ""));
 
         StatementImportProcessor processor = new StatementImportProcessor(statementImportRepository,
                 statementLineHashRepository, gateway, transactionService);

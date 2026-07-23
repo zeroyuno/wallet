@@ -43,6 +43,16 @@ public class StatementImportEntity {
     @CollectionTable(name = "statement_import_errors", joinColumns = @JoinColumn(name = "statement_import_id"))
     private List<StatementLineErrorEmbeddable> errors = new ArrayList<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "statement_import_lines", joinColumns = @JoinColumn(name = "statement_import_id"))
+    private List<StatementImportedLineEmbeddable> importedLines = new ArrayList<>();
+
+    @Column(name = "expense_column_header")
+    private String expenseColumnHeader;
+
+    @Column(name = "income_column_header")
+    private String incomeColumnHeader;
+
     @Column(name = "failure_reason")
     private String failureReason;
 
@@ -58,13 +68,18 @@ public class StatementImportEntity {
 
     public StatementImportEntity(UUID id, UUID userId, UUID accountId, StatementImportStatus status,
                                   int transactionsImported, List<StatementLineErrorEmbeddable> errors,
-                                  String failureReason, Instant startedAt, Instant lastActivityAt) {
+                                  List<StatementImportedLineEmbeddable> importedLines, String expenseColumnHeader,
+                                  String incomeColumnHeader, String failureReason, Instant startedAt,
+                                  Instant lastActivityAt) {
         this.id = id;
         this.userId = userId;
         this.accountId = accountId;
         this.status = status;
         this.transactionsImported = transactionsImported;
         this.errors = new ArrayList<>(errors);
+        this.importedLines = new ArrayList<>(importedLines);
+        this.expenseColumnHeader = expenseColumnHeader;
+        this.incomeColumnHeader = incomeColumnHeader;
         this.failureReason = failureReason;
         this.startedAt = startedAt;
         this.lastActivityAt = lastActivityAt;
@@ -92,6 +107,18 @@ public class StatementImportEntity {
 
     public List<StatementLineErrorEmbeddable> getErrors() {
         return errors;
+    }
+
+    public List<StatementImportedLineEmbeddable> getImportedLines() {
+        return importedLines;
+    }
+
+    public String getExpenseColumnHeader() {
+        return expenseColumnHeader;
+    }
+
+    public String getIncomeColumnHeader() {
+        return incomeColumnHeader;
     }
 
     public String getFailureReason() {

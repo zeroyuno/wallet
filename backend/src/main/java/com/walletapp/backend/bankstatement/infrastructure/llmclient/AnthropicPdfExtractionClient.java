@@ -166,13 +166,14 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                     LocalDate.parse(node.path("date").asString()),
                     new BigDecimal(node.path("amount").asString()),
                     resolveType(modelType, columnHeader, expenseHeader, incomeHeader),
-                    node.path("description").asString()));
+                    node.path("description").asString(),
+                    columnHeader));
         }
         List<UnparsedLineDto> unparsedLines = new ArrayList<>();
         for (JsonNode node : toolInput.path("unparsed_lines")) {
             unparsedLines.add(new UnparsedLineDto(node.path("raw_text").asString(), node.path("reason").asString()));
         }
-        return new PdfExtractionResult(transactions, unparsedLines);
+        return new PdfExtractionResult(transactions, unparsedLines, expenseHeader, incomeHeader);
     }
 
     // Corrección determinística sobre el juicio del modelo, sin diccionario propio (research.md #8):

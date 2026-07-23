@@ -52,6 +52,7 @@ class StatementImportProcessor {
                 .orElseThrow(() -> new IllegalStateException("Statement import not found: " + statementImportId));
         try {
             PdfExtractionResult result = pdfExtractionGateway.extract(pdfBytes);
+            statementImport.recordColumnHeaders(result.expenseColumnHeader(), result.incomeColumnHeader());
             for (ExtractedTransactionDto transaction : result.transactions()) {
                 importOneTransaction(statementImport, transaction);
             }
@@ -79,7 +80,8 @@ class StatementImportProcessor {
                     statementImport.accountId(), null);
             statementLineHashRepository.save(statementImport.userId(), statementImport.accountId(), hash,
                     internalId);
-            statementImport.recordTransactionImported();
+            statementImport.recordTransactionImported(transaction.date(), transaction.amount(), transaction.type(),
+                    transaction.description(), transaction.columnHeader());
         } catch (RuntimeException e) {
             statementImport.recordLineError(transaction.description(), e.getMessage());
         }

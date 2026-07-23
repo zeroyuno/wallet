@@ -2,10 +2,12 @@ package com.walletapp.backend.bankstatement.application;
 
 import com.walletapp.backend.account.application.AccountService;
 import com.walletapp.backend.bankstatement.application.dto.StatementImportView;
+import com.walletapp.backend.bankstatement.application.dto.StatementImportedLineView;
 import com.walletapp.backend.bankstatement.application.dto.StatementLineErrorView;
 import com.walletapp.backend.bankstatement.domain.StatementImport;
 import com.walletapp.backend.bankstatement.domain.StatementImportId;
 import com.walletapp.backend.bankstatement.domain.StatementImportRepository;
+import com.walletapp.backend.bankstatement.domain.StatementImportedLine;
 import com.walletapp.backend.bankstatement.domain.StatementLineError;
 import com.walletapp.backend.bankstatement.domain.exception.InvalidStatementAccountException;
 import com.walletapp.backend.bankstatement.domain.exception.StatementImportNotFoundException;
@@ -55,10 +57,17 @@ public class StatementImportService {
         return new StatementImportView(statementImport.id().value(), statementImport.accountId(),
                 statementImport.status().name(), statementImport.transactionsImported(),
                 statementImport.errors().stream().map(StatementImportService::toErrorView).toList(),
+                statementImport.importedLines().stream().map(StatementImportService::toLineView).toList(),
+                statementImport.expenseColumnHeader(), statementImport.incomeColumnHeader(),
                 statementImport.failureReason(), statementImport.startedAt(), statementImport.lastActivityAt());
     }
 
     private static StatementLineErrorView toErrorView(StatementLineError error) {
         return new StatementLineErrorView(error.rawText(), error.reason());
+    }
+
+    private static StatementImportedLineView toLineView(StatementImportedLine line) {
+        return new StatementImportedLineView(line.date(), line.amount(), line.type(), line.description(),
+                line.columnHeader());
     }
 }

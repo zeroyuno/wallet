@@ -14,9 +14,17 @@ public class FakePdfExtractionGateway implements PdfExtractionGateway {
     private final List<ExtractedTransactionDto> transactions = new ArrayList<>();
     private final List<UnparsedLineDto> unparsedLines = new ArrayList<>();
     private boolean shouldFail;
+    private String expenseColumnHeader = "";
+    private String incomeColumnHeader = "";
 
     public FakePdfExtractionGateway withTransactions(ExtractedTransactionDto... transactions) {
         this.transactions.addAll(List.of(transactions));
+        return this;
+    }
+
+    public FakePdfExtractionGateway withColumnHeaders(String expenseColumnHeader, String incomeColumnHeader) {
+        this.expenseColumnHeader = expenseColumnHeader;
+        this.incomeColumnHeader = incomeColumnHeader;
         return this;
     }
 
@@ -35,6 +43,7 @@ public class FakePdfExtractionGateway implements PdfExtractionGateway {
         if (shouldFail) {
             throw new PdfExtractionException("Fallo simulado de extracción");
         }
-        return new PdfExtractionResult(List.copyOf(transactions), List.copyOf(unparsedLines));
+        return new PdfExtractionResult(List.copyOf(transactions), List.copyOf(unparsedLines), expenseColumnHeader,
+                incomeColumnHeader);
     }
 }

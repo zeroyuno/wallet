@@ -2,8 +2,10 @@ package com.walletapp.backend.bankstatement.infrastructure.web;
 
 import com.walletapp.backend.bankstatement.application.StatementImportService;
 import com.walletapp.backend.bankstatement.application.dto.StatementImportView;
+import com.walletapp.backend.bankstatement.application.dto.StatementImportedLineView;
 import com.walletapp.backend.bankstatement.application.dto.StatementLineErrorView;
 import com.walletapp.backend.bankstatement.infrastructure.web.dto.StatementImportResponse;
+import com.walletapp.backend.bankstatement.infrastructure.web.dto.StatementImportedLineResponse;
 import com.walletapp.backend.bankstatement.infrastructure.web.dto.StatementLineErrorResponse;
 import com.walletapp.backend.shared.security.AuthenticatedUser;
 import org.slf4j.Logger;
@@ -62,10 +64,18 @@ public class StatementImportController {
     private static StatementImportResponse toResponse(StatementImportView view) {
         return new StatementImportResponse(view.id(), view.accountId(), view.status(),
                 view.transactionsImported(), view.errors().stream().map(StatementImportController::toErrorResponse)
-                        .toList(), view.failureReason(), view.startedAt(), view.lastActivityAt());
+                        .toList(),
+                view.importedLines().stream().map(StatementImportController::toLineResponse).toList(),
+                view.expenseColumnHeader(), view.incomeColumnHeader(), view.failureReason(), view.startedAt(),
+                view.lastActivityAt());
     }
 
     private static StatementLineErrorResponse toErrorResponse(StatementLineErrorView error) {
         return new StatementLineErrorResponse(error.rawText(), error.reason());
+    }
+
+    private static StatementImportedLineResponse toLineResponse(StatementImportedLineView line) {
+        return new StatementImportedLineResponse(line.date(), line.amount(), line.type(), line.description(),
+                line.columnHeader());
     }
 }

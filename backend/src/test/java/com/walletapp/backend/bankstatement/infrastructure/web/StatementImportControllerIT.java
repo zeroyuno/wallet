@@ -53,10 +53,11 @@ class StatementImportControllerIT {
             return new FakePdfExtractionGateway()
                     .withTransactions(
                             new ExtractedTransactionDto(LocalDate.of(2026, 1, 15), new BigDecimal("50"), "EXPENSE",
-                                    "Supermercado"),
+                                    "Supermercado", "cargos"),
                             new ExtractedTransactionDto(LocalDate.of(2026, 1, 20), new BigDecimal("1200"), "INCOME",
-                                    "Sueldo"))
-                    .withUnparsedLines(new UnparsedLineDto("$??? linea rara", "monto ilegible"));
+                                    "Sueldo", "abonos"))
+                    .withUnparsedLines(new UnparsedLineDto("$??? linea rara", "monto ilegible"))
+                    .withColumnHeaders("cargos", "abonos");
         }
     }
 
@@ -121,7 +122,12 @@ class StatementImportControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.transactionsImported").value(2))
                 .andExpect(jsonPath("$.errors.length()").value(1))
-                .andExpect(jsonPath("$.errors[0].reason").value("monto ilegible"));
+                .andExpect(jsonPath("$.errors[0].reason").value("monto ilegible"))
+                .andExpect(jsonPath("$.expenseColumnHeader").value("cargos"))
+                .andExpect(jsonPath("$.incomeColumnHeader").value("abonos"))
+                .andExpect(jsonPath("$.importedLines.length()").value(2))
+                .andExpect(jsonPath("$.importedLines[0].columnHeader").value("cargos"))
+                .andExpect(jsonPath("$.importedLines[1].columnHeader").value("abonos"));
 
         mockMvc.perform(get("/api/transactions?accountId=" + accountId).header("Authorization", "Bearer " + token))
                 .andExpect(jsonPath("$.length()").value(2))
