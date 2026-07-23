@@ -158,7 +158,17 @@ clasificados se corrigió solo; el otro ("Pago YAPE de X") seguía fallando. Cau
 real del usuario tiene headers combinados en terminología contable —
 `"CARGOS / DEBE"` / `"ABONOS / HABER"` (común en Perú/LatAm) — y el modelo aparentemente declaraba
 solo la segunda mitad del header (`"DEBE"`/`"HABER"` sueltos) en `source_column`, que no estaba en la
-lista de palabras clave (solo tenía cargo/abono/débito/crédito/depósito/retiro). Se agregan
-`"debe"`/`"haber"` a las listas de palabras clave, y se instruye explícitamente al modelo (prompt y
-schema) a copiar el encabezado de columna COMPLETO sin recortarlo, para reducir la chance de que esto
-se repita con otro banco que use una tercera terminología no contemplada todavía.
+lista de palabras clave (solo tenía cargo/abono/débito/crédito/depósito/retiro).
+
+**Rediseño (sin diccionario propio)**: agregar `"debe"`/`"haber"` a la lista resolvía este caso
+puntual, pero el problema de fondo seguía ahí — cualquier banco con OTRA terminología (o en otro
+idioma) iba a volver a fallar, y mantener una lista de palabras bancarias por país/banco no escala.
+Se reemplaza el enfoque: en vez de que el código intente reconocer nombres de columna, el propio
+modelo identifica UNA SOLA VEZ por documento (no fila por fila) cuáles son los dos encabezados reales
+del PDF — `expense_column_header` e `income_column_header`, con su texto literal tal cual aparece,
+sea cual sea el idioma o la terminología del banco — y por cada movimiento repite (copia textual) cuál
+de esos dos le corresponde en `column_header`. El código ya no necesita ningún diccionario: solo
+compara si `column_header` de una fila es exactamente igual a `expense_column_header` o
+`income_column_header` que el modelo ya identificó. Esto es genérico por diseño — la "lista de
+sinónimos bancarios" la resuelve el modelo con su propio entendimiento del idioma, no un `Set<String>`
+en Java que hay que seguir ampliando cada vez que aparece un banco nuevo.

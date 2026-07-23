@@ -18,7 +18,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Adaptador hacia la API de Mensajes de Anthropic (research.md #1, #1b). Manda el PDF completo como
@@ -43,6 +42,8 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
             {
               "type": "object",
               "properties": {
+                "expense_column_header": {"type": "string", "description": "El encabezado EXACTO y COMPLETO (tal cual aparece en el documento, sin recortar ni traducir) de la columna donde aparecen los montos que SALEN de la cuenta (gastos, cargos, débitos, retiros — sin importar cómo lo llame este banco en particular). String vacío si el documento no separa los movimientos en columnas de este tipo."},
+                "income_column_header": {"type": "string", "description": "El encabezado EXACTO y COMPLETO (tal cual aparece en el documento, sin recortar ni traducir) de la columna donde aparecen los montos que ENTRAN a la cuenta (ingresos, abonos, créditos, depósitos — sin importar cómo lo llame este banco en particular). String vacío si el documento no separa los movimientos en columnas de este tipo."},
                 "transactions": {
                   "type": "array",
                   "items": {
@@ -50,11 +51,11 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                     "properties": {
                       "date": {"type": "string", "description": "Fecha del movimiento, formato ISO 8601 YYYY-MM-DD"},
                       "amount": {"type": "number", "description": "Magnitud del monto, siempre positiva"},
-                      "source_column": {"type": "string", "description": "Texto EXACTO y COMPLETO del encabezado de la columna en la que aparece el monto de este movimiento en el documento, sin recortarlo (ej. si el header es 'CARGOS / DEBE', copiar 'CARGOS / DEBE' completo, no solo 'DEBE'). Dejar como string vacío si el documento no separa los movimientos en columnas de este tipo."},
-                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"], "description": "Si source_column no está vacío, DEBE ser consistente con esa columna (cargo/débito/retiro/debe -> EXPENSE, abono/crédito/depósito/haber -> INCOME). Si source_column está vacío, inferilo de la descripción."},
+                      "column_header": {"type": "string", "description": "Para este movimiento puntual: copiá acá EXACTAMENTE (carácter por carácter) el valor de expense_column_header o income_column_header, el que corresponda según en qué columna esté el monto de esta fila. String vacío si expense_column_header e income_column_header están vacíos."},
+                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"], "description": "Si column_header no está vacío, DEBE ser el tipo que corresponde a esa columna (income_column_header -> INCOME, expense_column_header -> EXPENSE). Si column_header está vacío, inferilo de la descripción."},
                       "description": {"type": "string", "description": "Descripción o concepto del movimiento"}
                     },
-                    "required": ["date", "amount", "source_column", "type", "description"]
+                    "required": ["date", "amount", "column_header", "type", "description"]
                   }
                 },
                 "unparsed_lines": {
@@ -69,26 +70,28 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                   }
                 }
               },
-              "required": ["transactions", "unparsed_lines"]
+              "required": ["expense_column_header", "income_column_header", "transactions", "unparsed_lines"]
             }
             """;
 
     private static final String PROMPT = "Este PDF es un estado de cuenta bancario o de tarjeta de "
-            + "crédito. Identificá cada movimiento (fecha, monto, columna de origen, si es ingreso o "
-            + "gasto, y una descripción breve) y llamá a la herramienta " + TOOL_NAME + " con la lista "
-            + "completa. "
-            + "Para cada movimiento, ANTES de decidir el tipo, fijate en qué columna del documento "
-            + "aparece el monto y copiá el encabezado completo tal cual en source_column, sin recortarlo "
-            + "(ej. si el header dice 'CARGOS / DEBE', copiá 'CARGOS / DEBE' entero, no solo una parte). "
-            + "Recién después, con eso ya identificado, asigná el tipo: un monto en una columna de "
-            + "cargo/débito/retiro/debe es EXPENSE, uno en abono/crédito/depósito/haber es INCOME — esto "
-            + "vale SIEMPRE que el documento tenga esa separación en columnas, sin importar lo que sugiera "
-            + "el texto de la descripción (ej. una fila que dice \"Pago YAPE de X\" en la columna de "
-            + "abonos es INCOME, no EXPENSE, aunque la palabra \"Pago\" sugiera lo contrario). Prestá "
-            + "atención fila por fila: no asumas el tipo de una fila por otras filas con descripción "
-            + "parecida — cada una puede estar en una columna distinta. Solo si el documento no separa "
-            + "los movimientos en columnas de este tipo, dejá source_column vacío e inferí el tipo a "
-            + "partir de la descripción. "
+            + "crédito. Antes de listar los movimientos, mirá los encabezados de columna del "
+            + "documento y determiná: ¿cuál es la columna donde aparecen los montos que SALEN de la "
+            + "cuenta (gastos), y cuál la de los montos que ENTRAN (ingresos)? Copiá esos dos "
+            + "encabezados literalmente (tal cual están escritos, sin traducir ni resumir) en "
+            + "expense_column_header e income_column_header — esto puede variar mucho de un banco a "
+            + "otro (cargo/abono, débito/crédito, retiro/depósito, debe/haber, u otra terminología), "
+            + "así que fijate en el documento real, no asumas nombres. Si el documento no separa los "
+            + "movimientos en columnas de este tipo, dejá ambos vacíos. "
+            + "Después, identificá cada movimiento (fecha, monto, en cuál de esas dos columnas está, "
+            + "si es ingreso o gasto, y una descripción breve) y llamá a la herramienta " + TOOL_NAME
+            + " con todo. Para cada movimiento, copiá en column_header el mismo texto EXACTO que ya "
+            + "pusiste en expense_column_header o income_column_header (el que corresponda) — y el "
+            + "tipo tiene que ser consistente con esa columna, sin importar lo que sugiera el texto de "
+            + "la descripción (ej. una fila que dice \"Pago YAPE de X\" en la columna de ingresos es "
+            + "INCOME, no EXPENSE, aunque la palabra \"Pago\" sugiera lo contrario). Prestá atención "
+            + "fila por fila: no asumas el tipo de una fila por otras filas con descripción parecida — "
+            + "cada una puede estar en una columna distinta. "
             + "Si alguna línea no se puede interpretar con confianza suficiente (monto ambiguo, fecha "
             + "ilegible, etc.), incluila en unparsed_lines con el texto tal cual aparece y el motivo, "
             + "en vez de adivinar.";
@@ -151,14 +154,17 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
     }
 
     private PdfExtractionResult toResult(JsonNode toolInput) {
+        String expenseHeader = normalizeHeader(toolInput.path("expense_column_header").asString(""));
+        String incomeHeader = normalizeHeader(toolInput.path("income_column_header").asString(""));
+
         List<ExtractedTransactionDto> transactions = new ArrayList<>();
         for (JsonNode node : toolInput.path("transactions")) {
             String modelType = node.path("type").asString();
-            String sourceColumn = node.path("source_column").asString("");
+            String columnHeader = normalizeHeader(node.path("column_header").asString(""));
             transactions.add(new ExtractedTransactionDto(
                     LocalDate.parse(node.path("date").asString()),
                     new BigDecimal(node.path("amount").asString()),
-                    resolveType(modelType, sourceColumn),
+                    resolveType(modelType, columnHeader, expenseHeader, incomeHeader),
                     node.path("description").asString()));
         }
         List<UnparsedLineDto> unparsedLines = new ArrayList<>();
@@ -168,29 +174,30 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
         return new PdfExtractionResult(transactions, unparsedLines);
     }
 
-    // Corrección determinística sobre el juicio del modelo (research.md #7, T026): a veces el
-    // modelo declara correctamente la columna en source_column pero igual asigna el type que no le
-    // corresponde (sobre todo cuando la descripción "suena" al tipo contrario, ej. "Pago YAPE de X"
-    // es un ingreso pese a la palabra "Pago"). Si la columna reportada matchea un término bancario
-    // conocido, esa columna manda sobre el type del modelo; si no matchea nada (documento sin
-    // columnas separadas), se respeta el type que ya infirió el modelo por descripción.
-    // "debe"/"haber" son terminología contable (muy usada en Perú/LatAm) — headers combinados como
-    // "CARGOS / DEBE" o "ABONOS / HABER" pueden hacer que el modelo declare solo la segunda mitad en
-    // source_column (ej. "DEBE" a secas), así que ambas variantes tienen que estar reconocidas.
-    private static final Set<String> INCOME_COLUMN_KEYWORDS = Set.of("abono", "credito", "crédito", "deposito",
-            "depósito", "ingreso", "haber");
-    private static final Set<String> EXPENSE_COLUMN_KEYWORDS = Set.of("cargo", "debito", "débito", "retiro",
-            "egreso", "debe");
-
-    private static String resolveType(String modelType, String sourceColumn) {
-        String normalized = sourceColumn == null ? "" : sourceColumn.toLowerCase().trim();
-        if (INCOME_COLUMN_KEYWORDS.stream().anyMatch(normalized::contains)) {
-            return "INCOME";
+    // Corrección determinística sobre el juicio del modelo, sin diccionario propio (research.md #8):
+    // a veces el modelo identifica bien la columna de cada fila (column_header) pero igual asigna un
+    // type inconsistente (sobre todo cuando la descripción "suena" al tipo contrario, ej. "Pago YAPE
+    // de X" es un ingreso pese a la palabra "Pago"). En vez de mantener una lista de palabras clave
+    // bancarias (no escala: cada banco/país usa una terminología distinta), se compara el
+    // column_header de cada fila contra expense_column_header/income_column_header que el propio
+    // modelo identificó una sola vez al principio del documento — es el modelo el que entiende el
+    // idioma/terminología de este banco en particular, el código solo hace un match de texto exacto.
+    private static String resolveType(String modelType, String columnHeader, String expenseHeader,
+                                       String incomeHeader) {
+        if (columnHeader.isEmpty()) {
+            return modelType;
         }
-        if (EXPENSE_COLUMN_KEYWORDS.stream().anyMatch(normalized::contains)) {
+        if (!expenseHeader.isEmpty() && columnHeader.equals(expenseHeader)) {
             return "EXPENSE";
         }
+        if (!incomeHeader.isEmpty() && columnHeader.equals(incomeHeader)) {
+            return "INCOME";
+        }
         return modelType;
+    }
+
+    private static String normalizeHeader(String header) {
+        return header == null ? "" : header.toLowerCase().trim().replaceAll("\\s+", " ");
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
