@@ -74,6 +74,13 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
     private static final String PROMPT = "Este PDF es un estado de cuenta bancario o de tarjeta de "
             + "crédito. Identificá cada movimiento (fecha, monto, si es ingreso o gasto, y una "
             + "descripción breve) y llamá a la herramienta " + TOOL_NAME + " con la lista completa. "
+            + "Para decidir si un movimiento es ingreso o gasto: si el documento tiene columnas "
+            + "separadas para cargos/débitos y abonos/créditos (o nombres equivalentes como "
+            + "'Retiro'/'Depósito', 'Débito'/'Crédito', 'Cargo'/'Abono'), usá SIEMPRE en qué columna "
+            + "aparece el monto — un monto en la columna de cargos/débitos es EXPENSE, uno en la "
+            + "columna de abonos/créditos es INCOME — sin importar lo que sugiera el texto de la "
+            + "descripción. Solo si el documento no separa los movimientos en columnas de este tipo, "
+            + "inferí el tipo a partir de la descripción. "
             + "Si alguna línea no se puede interpretar con confianza suficiente (monto ambiguo, fecha "
             + "ilegible, etc.), incluila en unparsed_lines con el texto tal cual aparece y el motivo, "
             + "en vez de adivinar.";
@@ -99,9 +106,9 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
         String base64Pdf = Base64.getEncoder().encodeToString(pdfBytes);
         AnthropicRequest request = new AnthropicRequest(MODEL, MAX_TOKENS,
                 List.of(new AnthropicMessage("user", List.of(
-                        new AnthropicContentBlock("document",
-                                new AnthropicDocumentSource("base64", "application/pdf", base64Pdf), null),
-                        new AnthropicContentBlock("text", null, PROMPT)))),
+                        new AnthropicDocumentBlock("document",
+                                new AnthropicDocumentSource("base64", "application/pdf", base64Pdf)),
+                        new AnthropicTextBlock("text", PROMPT)))),
                 List.of(new AnthropicTool(TOOL_NAME, TOOL_DESCRIPTION, toolInputSchema)),
                 new AnthropicToolChoice("tool", TOOL_NAME));
 
@@ -157,10 +164,17 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                                      @JsonProperty("tool_choice") AnthropicToolChoice toolChoice) {
     }
 
-    private record AnthropicMessage(String role, List<AnthropicContentBlock> content) {
+    // content es List<Object> a propósito: cada bloque (documento, texto) tiene sus propios campos
+    // y ninguno más — la API de Anthropic rechaza con 400 "Extra inputs are not permitted" si un
+    // bloque de tipo "document" incluye una clave "text" aunque sea null (un solo record con todos
+    // los campos posibles serializaría esa clave igual).
+    private record AnthropicMessage(String role, List<Object> content) {
     }
 
-    private record AnthropicContentBlock(String type, AnthropicDocumentSource source, String text) {
+    private record AnthropicDocumentBlock(String type, AnthropicDocumentSource source) {
+    }
+
+    private record AnthropicTextBlock(String type, String text) {
     }
 
     private record AnthropicDocumentSource(String type, @JsonProperty("media_type") String mediaType, String data) {

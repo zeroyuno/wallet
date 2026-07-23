@@ -158,6 +158,40 @@ class StatementImportControllerIT {
                 .andExpect(jsonPath("$.length()").value(2));
     }
 
+    // Regresión: borrar manualmente una transacción importada de un PDF debe permitir volver a
+    // importarla — antes fallaba porque el hash de deduplicación no se borraba con la transacción
+    // (sin FK ON DELETE CASCADE hacia transactions), dejando un hash huérfano que bloqueaba la
+    // re-importación para siempre.
+    @Test
+    void reImportsATransactionAfterItWasManuallyDeleted() throws Exception {
+        String token = registerAndLogin("statement-redelete@example.com");
+        String accountId = createAccount(token);
+
+        String firstImportId = uploadStatement(token, accountId);
+        waitForCompletion(token, firstImportId);
+
+        String transactionsJson = mockMvc.perform(get("/api/transactions?accountId=" + accountId)
+                        .header("Authorization", "Bearer " + token))
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<String> transactionIds = com.jayway.jsonpath.JsonPath.read(transactionsJson, "$[*].id");
+        for (String transactionId : transactionIds) {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .delete("/api/transactions/" + transactionId)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isNoContent());
+        }
+        mockMvc.perform(get("/api/transactions?accountId=" + accountId).header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.length()").value(0));
+
+        String secondImportId = uploadStatement(token, accountId);
+        waitForCompletion(token, secondImportId);
+
+        mockMvc.perform(get("/api/statement-imports/" + secondImportId).header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.transactionsImported").value(2));
+        mockMvc.perform(get("/api/transactions?accountId=" + accountId).header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     @Test
     void importsAreIsolatedBetweenUsers() throws Exception {
         String ownerToken = registerAndLogin("statement-iso-a@example.com");
