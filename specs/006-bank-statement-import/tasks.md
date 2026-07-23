@@ -174,9 +174,12 @@ cuenta no cambia entre la primera y la segunda subida.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T025 Verificar cobertura JaCoCo >80% en `domain`/`application` de `bankstatement`
-- [ ] T026 [P] Correr manualmente los 5 escenarios de `quickstart.md` contra la API real de Anthropic,
-      con un PDF real de estado de cuenta y una `ANTHROPIC_API_KEY` válida (pendiente: no disponible en
-      este entorno, requiere una API key y un PDF real del usuario)
+- [X] T026 [P] Correr manualmente los 5 escenarios de `quickstart.md` contra la API real de Anthropic,
+      con un PDF real de estado de cuenta y una `ANTHROPIC_API_KEY` válida. Corrido por el usuario
+      contra un estado de cuenta real (49 movimientos, monto/fecha/descripción correctos) — encontró
+      y permitió corregir 3 bugs reales: request mal serializado hacia Anthropic (400), tipo
+      ingreso/gasto inferido solo de la descripción en vez de la columna del documento, y
+      deduplicación huérfana al borrar transacciones manualmente (ver research.md #7)
 - [X] T027 Revisar que `StatementLineError.reason` y `StatementImport.failureReason` sean legibles
       para el usuario (sin detalles técnicos de la API de Anthropic), consistente con el resto de la
       app

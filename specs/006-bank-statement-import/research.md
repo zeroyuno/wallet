@@ -99,3 +99,30 @@ un PDF de varias páginas).
 
 **Rationale**: 20MB cubre con margen amplio un estado de cuenta típico de varias páginas (que
 normalmente pesan unos pocos MB), sin abrir la puerta a archivos desproporcionadamente grandes.
+
+## 7. Correcciones tras probar con un PDF real (T026)
+
+Tres bugs reales encontrados recién al validar contra un estado de cuenta real del usuario (mismo
+patrón que la feature 005: los defectos de integración con una API externa no aparecen hasta probar
+con datos reales, no con el fake usado en los tests automatizados):
+
+1. **Request mal serializado hacia Anthropic**: el bloque de contenido `document` y el bloque `text`
+   compartían un mismo record Java con los campos de ambos — Jackson serializaba el campo no usado
+   como `null` en vez de omitirlo, y la API de Anthropic rechaza con `400
+   "Extra inputs are not permitted"` cualquier clave no esperada en un bloque, aunque sea `null`. Se
+   corrige separando `document`/`text` en dos records distintos sin campos de más, tipando
+   `AnthropicMessage.content` como `List<Object>` (cada bloque serializa solo lo suyo).
+2. **Tipo ingreso/gasto inferido solo de la descripción**: el primer prompt le pedía al modelo
+   determinar `INCOME`/`EXPENSE` únicamente a partir del texto de la descripción. Muchos estados de
+   cuenta reales (el de prueba incluido) separan los movimientos en columnas explícitas (cargo/abono,
+   débito/crédito, retiro/depósito) — esa es la fuente de verdad, no el texto. Se corrige el prompt
+   para que priorice SIEMPRE la columna cuando el documento la tiene, y solo caiga a inferir por
+   descripción si no existe esa separación.
+3. **Deduplicación huérfana al borrar transacciones manualmente**: `statement_import_line_hashes` no
+   tenía una foreign key hacia `transactions` — al borrar una transacción importada (vía
+   `DELETE /api/transactions/{id}`, uso normal de la app), su hash de deduplicación quedaba huérfano
+   y bloqueaba para siempre una futura re-importación de ese mismo movimiento (la corrida terminaba en
+   `COMPLETED` con `transactionsImported: 0`, sin ningún error visible). Se agrega la FK con
+   `ON DELETE CASCADE` (migración V8) — a diferencia de `import_external_refs` de la feature 005, acá
+   sí es posible una FK simple porque `internal_transaction_id` siempre referencia `transactions`
+   (nunca cuentas ni categorías, que la feature 006 no crea).
