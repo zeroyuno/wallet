@@ -30,6 +30,7 @@ Existe solo para que el feed de sincronización pueda informar borrados (researc
 | `deletedIds` | salida | lista de UUID | Borrados desde `since`. |
 | `nextSince` | salida | Instant | Cursor a usar en la próxima llamada (timestamp del último elemento devuelto). |
 | `hasMore` | salida | boolean | Si quedan más cambios más allá de esta página. |
+| `totalRemaining` | salida | long | Total de cambios pendientes desde `since` (no solo esta página) — solo para la barra de progreso del cliente (research.md #8). |
 
 ## Android — caché local (Room)
 

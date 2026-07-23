@@ -123,7 +123,12 @@ public class TransactionService {
                 .toList();
         Instant nextSince = page.isEmpty() ? effectiveSince : page.get(page.size() - 1).timestamp();
 
-        return new TransactionSyncResult(upserts, deletedIds, nextSince, hasMore);
+        // Total de cambios pendientes desde `since` (no desde el cursor que avanza) — solo para que el
+        // cliente pueda mostrar una barra de progreso ("258/1000"); no se usa para paginar.
+        long totalRemaining = transactionRepository.countChangedSince(userId, effectiveSince)
+                + transactionRepository.countDeletedSince(userId, effectiveSince);
+
+        return new TransactionSyncResult(upserts, deletedIds, nextSince, hasMore, totalRemaining);
     }
 
     private static int resolveSyncLimit(Integer requestedLimit) {

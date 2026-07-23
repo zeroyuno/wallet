@@ -115,3 +115,21 @@ el repositorio, igual que la constitución exige para esta capa.
 
 **Alternatives considered**: que el ViewModel hable directamente con Room y con Retrofit — descartado,
 rompe la responsabilidad ya establecida del Repository como único punto de acceso a datos.
+
+## 8. Barra de progreso de la sincronización inicial (agregado post-merge)
+
+**Decision**: `GET /api/transactions/sync` devuelve también `totalRemaining` — la cantidad total de
+cambios pendientes desde el `since` recibido en ESE pedido (dos `COUNT` aparte, no relacionados con la
+paginación en sí). El cliente arma la barra de progreso ("258/1000") tomando el `totalRemaining` de la
+**primera** página del pull como total fijo, y acumulando `upserts.size + deletedIds.size` de cada
+página como progreso — sin volver a leer `totalRemaining` de las páginas siguientes (evita que el
+número total "salte" si el backend lo recalcula con datos frescos a mitad del pull).
+
+**Rationale**: pedido explícito del usuario tras la primera ronda de uso real de la feature 007 — el
+pull inicial de ~11.000 movimientos tarda unos segundos y la única señal visible antes era un spinner
+genérico, sin indicar cuánto faltaba.
+
+**Alternatives considered**: un endpoint de conteo aparte (`GET /api/transactions/sync/count`) llamado
+una vez antes de empezar el loop — descartado por agregar una llamada de red extra e introducir una
+ventana donde el conteo podría quedar desactualizado respecto al primer `since` real que usa el loop;
+incluirlo en la respuesta ya paginada evita esa duplicación.

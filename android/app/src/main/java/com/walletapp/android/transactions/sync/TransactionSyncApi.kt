@@ -24,7 +24,10 @@ data class TransactionSyncResponse(
     val upserts: List<TransactionSyncItemResponse>,
     val deletedIds: List<String>,
     val nextSince: String,
-    val hasMore: Boolean
+    val hasMore: Boolean,
+    // Total de cambios pendientes desde el `since` de este pedido (no solo esta página) — solo para
+    // mostrar progreso ("258/1000"), research.md #8 de la feature 007.
+    val totalRemaining: Long
 )
 
 interface TransactionSyncApi {

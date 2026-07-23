@@ -18,4 +18,6 @@ interface SpringDataDeletedTransactionRepository extends JpaRepository<DeletedTr
             """)
     List<DeletedTransactionEntity> findChangedSince(@Param("userId") UUID userId, @Param("since") Instant since,
                                                       Pageable pageable);
+
+    long countByUserIdAndDeletedAtAfter(UUID userId, Instant since);
 }

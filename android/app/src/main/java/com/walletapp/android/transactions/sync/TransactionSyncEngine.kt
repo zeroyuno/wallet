@@ -30,16 +30,27 @@ class TransactionSyncEngine @Inject constructor(
     // éxito — si una llamada o una escritura local falla a mitad, el cursor anterior queda intacto y
     // la próxima corrida retoma desde ahí (upserts/deletes son idempotentes, así que reaplicar una
     // página ya aplicada parcialmente no causa problemas).
-    suspend fun pull() {
+    // onProgress (research.md #8): `total` se fija con el totalRemaining de la PRIMERA página (no se
+    // recalcula en las siguientes, para que la barra de progreso no salte) y `imported` es acumulado.
+    suspend fun pull(onProgress: suspend (imported: Int, total: Int) -> Unit = { _, _ -> }) {
         var cursor = syncCursorStore.getCursor()
         var hasMore = true
+        var importedSoFar = 0
+        var total = 0
+        var firstPage = true
         while (hasMore) {
             val response = transactionSyncApi.sync(since = cursor, limit = null)
+            if (firstPage) {
+                total = response.totalRemaining.toInt()
+                firstPage = false
+            }
             val upsertEntities = response.upserts.map { it.toEntity() }
             transactionDao.applySyncPage(upsertEntities, response.deletedIds)
+            importedSoFar += response.upserts.size + response.deletedIds.size
             cursor = response.nextSince
             syncCursorStore.saveCursor(cursor)
             hasMore = response.hasMore
+            onProgress(importedSoFar, total)
         }
     }
 

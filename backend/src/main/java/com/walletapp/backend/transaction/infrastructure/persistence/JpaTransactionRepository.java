@@ -89,6 +89,16 @@ class JpaTransactionRepository implements TransactionRepository {
                 .toList();
     }
 
+    @Override
+    public long countChangedSince(UUID userId, Instant since) {
+        return springDataRepository.countByUserIdAndUpdatedAtAfter(userId, since);
+    }
+
+    @Override
+    public long countDeletedSince(UUID userId, Instant since) {
+        return deletedTransactionRepository.countByUserIdAndDeletedAtAfter(userId, since);
+    }
+
     private TransactionEntity toEntity(Transaction transaction) {
         Set<LabelEntity> labelEntities = resolveLabels(transaction.userId(), transaction.labels());
         return new TransactionEntity(

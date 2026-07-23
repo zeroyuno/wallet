@@ -17,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -140,6 +141,22 @@ fun TransactionListScreen(
                     text = (syncState as SyncUiState.Error).message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Barra de progreso de la sincronización inicial (feature 007, research.md #8) — solo se
+            // muestra cuando ya se sabe el total (primera página del pull ya respondió).
+            val syncingState = syncState as? SyncUiState.Syncing
+            if (syncingState != null && syncingState.total > 0) {
+                LinearProgressIndicator(
+                    progress = { syncingState.imported.toFloat() / syncingState.total },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Sincronizando ${syncingState.imported} / ${syncingState.total}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }

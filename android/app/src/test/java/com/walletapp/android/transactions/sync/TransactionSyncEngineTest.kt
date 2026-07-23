@@ -126,8 +126,8 @@ class TransactionSyncEngineTest {
     @Test
     fun `pull applies upserts and deletes across multiple pages until hasMore is false`() = runTest {
         val syncApi = FakeTransactionSyncApi().apply {
-            responses.add(TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", true))
-            responses.add(TransactionSyncResponse(listOf(syncItem("t2")), listOf("t1"), "cursor-2", false))
+            responses.add(TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", true, 2))
+            responses.add(TransactionSyncResponse(listOf(syncItem("t2")), listOf("t1"), "cursor-2", false, 2))
         }
         val dao = FakeTransactionDao()
         val cursorStore = FakeSyncCursorStore()
@@ -141,10 +141,27 @@ class TransactionSyncEngineTest {
         assertEquals(listOf(null, "cursor-1"), syncApi.requestedSinceValues)
     }
 
+    // research.md #8: el total que ve la UI ("258/1000") queda fijo al de la primera página — no
+    // salta aunque el backend recalcule un totalRemaining distinto en páginas siguientes.
+    @Test
+    fun `pull reports cumulative progress against a stable total from the first page`() = runTest {
+        val syncApi = FakeTransactionSyncApi().apply {
+            responses.add(TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", true, 3))
+            responses.add(TransactionSyncResponse(listOf(syncItem("t2")), listOf("t3"), "cursor-2", false, 2))
+        }
+        val dao = FakeTransactionDao()
+        val engine = TransactionSyncEngine(syncApi, FakeTransactionApi(), dao, FakeSyncCursorStore())
+        val progressCalls = mutableListOf<Pair<Int, Int>>()
+
+        engine.pull { imported, total -> progressCalls.add(imported to total) }
+
+        assertEquals(listOf(1 to 3, 3 to 3), progressCalls)
+    }
+
     @Test
     fun `pull preserves the previous cursor when a page fails midway`() = runTest {
         val syncApi = FakeTransactionSyncApi().apply {
-            responses.add(TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", false))
+            responses.add(TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", false, 1))
         }
         val dao = FakeTransactionDao()
         val cursorStore = FakeSyncCursorStore()
@@ -163,7 +180,7 @@ class TransactionSyncEngineTest {
     @Test
     fun `pull with nothing to sync leaves the cursor untouched`() = runTest {
         val syncApi = FakeTransactionSyncApi().apply {
-            responses.add(TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false))
+            responses.add(TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false, 0))
         }
         val dao = FakeTransactionDao()
         val cursorStore = FakeSyncCursorStore()

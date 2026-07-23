@@ -38,4 +38,6 @@ interface SpringDataTransactionRepository extends JpaRepository<TransactionEntit
             + "ORDER BY t.updatedAt ASC, t.id ASC")
     List<TransactionEntity> findChangedSince(@Param("userId") UUID userId, @Param("since") Instant since,
                                               Pageable pageable);
+
+    long countByUserIdAndUpdatedAtAfter(UUID userId, Instant since);
 }
