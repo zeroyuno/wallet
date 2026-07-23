@@ -5,6 +5,7 @@ import com.walletapp.android.auth.AuthApi
 import com.walletapp.android.categories.CategoryApi
 import com.walletapp.android.data.TokenStore
 import com.walletapp.android.transactions.TransactionApi
+import com.walletapp.android.transactions.sync.TransactionSyncApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -76,4 +77,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideTransactionApi(retrofit: Retrofit): TransactionApi = retrofit.create(TransactionApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTransactionSyncApi(retrofit: Retrofit): TransactionSyncApi =
+        retrofit.create(TransactionSyncApi::class.java)
 }

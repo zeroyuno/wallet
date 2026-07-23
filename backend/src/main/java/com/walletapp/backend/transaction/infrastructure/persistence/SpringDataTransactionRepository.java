@@ -1,10 +1,12 @@
 package com.walletapp.backend.transaction.infrastructure.persistence;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,4 +33,9 @@ interface SpringDataTransactionRepository extends JpaRepository<TransactionEntit
             WHERE t.userId = :userId AND t.accountId = :accountId
             """)
     BigDecimal sumNetAmountForAccount(@Param("userId") UUID userId, @Param("accountId") UUID accountId);
+
+    @Query("SELECT t FROM TransactionEntity t WHERE t.userId = :userId AND t.updatedAt > :since "
+            + "ORDER BY t.updatedAt ASC, t.id ASC")
+    List<TransactionEntity> findChangedSince(@Param("userId") UUID userId, @Param("since") Instant since,
+                                              Pageable pageable);
 }

@@ -4,8 +4,10 @@ import com.walletapp.backend.account.application.AccountService;
 import com.walletapp.backend.account.application.CategoryService;
 import com.walletapp.backend.transaction.application.dto.TransactionCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionFilter;
+import com.walletapp.backend.transaction.application.dto.TransactionSyncResult;
 import com.walletapp.backend.transaction.application.dto.TransactionUpdateCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionView;
+import com.walletapp.backend.transaction.domain.DeletedTransactionTombstone;
 import com.walletapp.backend.transaction.domain.Transaction;
 import com.walletapp.backend.transaction.domain.TransactionId;
 import com.walletapp.backend.transaction.domain.TransactionRepository;
@@ -20,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +32,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -310,5 +316,78 @@ class TransactionServiceTest {
         assertThat(saved.recordState()).contains("CONFIRMED");
         assertThat(saved.walletTransferId()).contains("wallet-transfer-1");
         assertThat(saved.labels()).containsExactlyInAnyOrder("viaje", "trabajo");
+    }
+
+    @Test
+    void syncDefaultsSinceToEpochWhenNotProvided() {
+        when(transactionRepository.findChangedSince(eq(userId), eq(Instant.EPOCH), anyInt())).thenReturn(List.of());
+        when(transactionRepository.findDeletedSince(eq(userId), eq(Instant.EPOCH), anyInt())).thenReturn(List.of());
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        TransactionSyncResult result = service.sync(userId, null, null);
+
+        assertThat(result.upserts()).isEmpty();
+        assertThat(result.deletedIds()).isEmpty();
+        assertThat(result.hasMore()).isFalse();
+        assertThat(result.nextSince()).isEqualTo(Instant.EPOCH);
+        verify(transactionRepository).findChangedSince(userId, Instant.EPOCH, 201);
+        verify(transactionRepository).findDeletedSince(userId, Instant.EPOCH, 201);
+    }
+
+    // FR-003/research.md #1: upserts y borrados se combinan en un único orden por timestamp, y la
+    // página se recorta al límite pedido sin importar de qué fuente venga cada cambio.
+    @Test
+    void syncOrdersUpsertsAndDeletesTogetherAndRespectsLimit() {
+        Instant since = Instant.now();
+        Instant t1 = since.plusSeconds(1);
+        Instant t2 = since.plusSeconds(2);
+        Instant t3 = since.plusSeconds(3);
+        Instant t4 = since.plusSeconds(4);
+        Instant t5 = since.plusSeconds(5);
+
+        UUID upsert1 = UUID.randomUUID();
+        UUID delete2 = UUID.randomUUID();
+        UUID upsert3 = UUID.randomUUID();
+        UUID delete4 = UUID.randomUUID();
+        UUID upsert5 = UUID.randomUUID();
+
+        when(transactionRepository.findChangedSince(eq(userId), eq(since), anyInt())).thenReturn(List.of(
+                transactionWithUpdatedAt(upsert1, t1), transactionWithUpdatedAt(upsert3, t3),
+                transactionWithUpdatedAt(upsert5, t5)));
+        when(transactionRepository.findDeletedSince(eq(userId), eq(since), anyInt())).thenReturn(List.of(
+                new DeletedTransactionTombstone(delete2, userId, t2), new DeletedTransactionTombstone(delete4, userId,
+                        t4)));
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        TransactionSyncResult result = service.sync(userId, since, 3);
+
+        assertThat(result.upserts()).extracting(v -> v.id()).containsExactly(upsert1, upsert3);
+        assertThat(result.deletedIds()).containsExactly(delete2);
+        assertThat(result.hasMore()).isTrue();
+        assertThat(result.nextSince()).isEqualTo(t3);
+    }
+
+    @Test
+    void syncHasMoreFalseWhenEverythingFitsInOnePage() {
+        Instant since = Instant.now();
+        Instant t1 = since.plusSeconds(1);
+        UUID upsertId = UUID.randomUUID();
+
+        when(transactionRepository.findChangedSince(eq(userId), eq(since), anyInt()))
+                .thenReturn(List.of(transactionWithUpdatedAt(upsertId, t1)));
+        when(transactionRepository.findDeletedSince(eq(userId), eq(since), anyInt())).thenReturn(List.of());
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        TransactionSyncResult result = service.sync(userId, since, 50);
+
+        assertThat(result.upserts()).hasSize(1);
+        assertThat(result.hasMore()).isFalse();
+        assertThat(result.nextSince()).isEqualTo(t1);
+    }
+
+    private Transaction transactionWithUpdatedAt(UUID id, Instant updatedAt) {
+        return Transaction.reconstitute(TransactionId.of(id), userId, TransactionType.EXPENSE, new BigDecimal("10"),
+                LocalDate.of(2026, 1, 1), null, accountId, null, updatedAt, updatedAt, null, null, null, null,
+                Set.of());
     }
 }

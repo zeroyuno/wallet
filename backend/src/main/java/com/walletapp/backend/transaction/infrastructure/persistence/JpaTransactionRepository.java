@@ -1,11 +1,15 @@
 package com.walletapp.backend.transaction.infrastructure.persistence;
 
+import com.walletapp.backend.transaction.domain.DeletedTransactionTombstone;
 import com.walletapp.backend.transaction.domain.Transaction;
 import com.walletapp.backend.transaction.domain.TransactionId;
 import com.walletapp.backend.transaction.domain.TransactionRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -19,11 +23,14 @@ class JpaTransactionRepository implements TransactionRepository {
 
     private final SpringDataTransactionRepository springDataRepository;
     private final SpringDataLabelRepository labelRepository;
+    private final SpringDataDeletedTransactionRepository deletedTransactionRepository;
 
     JpaTransactionRepository(SpringDataTransactionRepository springDataRepository,
-                              SpringDataLabelRepository labelRepository) {
+                              SpringDataLabelRepository labelRepository,
+                              SpringDataDeletedTransactionRepository deletedTransactionRepository) {
         this.springDataRepository = springDataRepository;
         this.labelRepository = labelRepository;
+        this.deletedTransactionRepository = deletedTransactionRepository;
     }
 
     @Override
@@ -45,6 +52,8 @@ class JpaTransactionRepository implements TransactionRepository {
     @Override
     public void deleteByIdAndUserId(TransactionId id, UUID userId) {
         springDataRepository.deleteByIdAndUserId(id.value(), userId);
+        deletedTransactionRepository.save(
+                new DeletedTransactionEntity(UUID.randomUUID(), id.value(), userId, Instant.now()));
     }
 
     @Override
@@ -64,6 +73,22 @@ class JpaTransactionRepository implements TransactionRepository {
         return springDataRepository.sumNetAmountForAccount(userId, accountId);
     }
 
+    @Override
+    public List<Transaction> findChangedSince(UUID userId, Instant since, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return springDataRepository.findChangedSince(userId, since, pageable).stream()
+                .map(JpaTransactionRepository::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<DeletedTransactionTombstone> findDeletedSince(UUID userId, Instant since, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return deletedTransactionRepository.findChangedSince(userId, since, pageable).stream()
+                .map(e -> new DeletedTransactionTombstone(e.getTransactionId(), e.getUserId(), e.getDeletedAt()))
+                .toList();
+    }
+
     private TransactionEntity toEntity(Transaction transaction) {
         Set<LabelEntity> labelEntities = resolveLabels(transaction.userId(), transaction.labels());
         return new TransactionEntity(
@@ -76,6 +101,7 @@ class JpaTransactionRepository implements TransactionRepository {
                 transaction.accountId(),
                 transaction.categoryId().orElse(null),
                 transaction.createdAt(),
+                transaction.updatedAt(),
                 transaction.counterParty().orElse(null),
                 transaction.paymentType().orElse(null),
                 transaction.recordState().orElse(null),
@@ -108,6 +134,7 @@ class JpaTransactionRepository implements TransactionRepository {
                 entity.getAccountId(),
                 entity.getCategoryId(),
                 entity.getCreatedAt(),
+                entity.getUpdatedAt(),
                 entity.getCounterParty(),
                 entity.getPaymentType(),
                 entity.getRecordState(),

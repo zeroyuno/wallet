@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Wallet Transactions Sync API
+  version: "1.0.0"
+  description: Contrato de la feature 007 (Caché local y sincronización). Un único endpoint nuevo,
+    complementario a los ya definidos en specs/003-transactions/contracts/transactions-api.yaml
+    (que no cambian). Requiere autenticación (JWT) y opera exclusivamente sobre los datos del usuario
+    autenticado, igual que el resto de /api/transactions.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /api/transactions/sync:
+    get:
+      summary: Traer, de forma paginada por cursor, los movimientos creados/editados y eliminados
+        desde la última sincronización (FR-003, FR-004, research.md #1)
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Cursor devuelto por una llamada anterior (nextSince). Ausente = traer desde
+            el principio (primera sincronización).
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          description: Tamaño de página. El servidor aplica un máximo razonable si se omite o se
+            excede.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Página de cambios desde el cursor indicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionSyncResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TransactionSyncResponse:
+      type: object
+      properties:
+        upserts:
+          type: array
+          description: Movimientos creados o editados desde el cursor, ordenados por updatedAt
+            ascendente (desempate por id). Mismo shape que TransactionResponse
+            (specs/003-transactions/contracts/transactions-api.yaml) más updatedAt.
+          items:
+            allOf:
+              - $ref: "../../003-transactions/contracts/transactions-api.yaml#/components/schemas/TransactionResponse"
+              - type: object
+                properties:
+                  updatedAt:
+                    type: string
+                    format: date-time
+        deletedIds:
+          type: array
+          description: Ids de movimientos eliminados desde el cursor.
+          items:
+            type: string
+            format: uuid
+        nextSince:
+          type: string
+          format: date-time
+          description: Cursor a usar en la próxima llamada.
+        hasMore:
+          type: boolean
+          description: Si quedan más cambios más allá de esta página (el cliente debe seguir
+            pidiendo hasta que sea false).

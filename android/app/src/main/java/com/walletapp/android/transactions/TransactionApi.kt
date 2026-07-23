@@ -8,7 +8,6 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
-import retrofit2.http.Query
 
 @Serializable
 data class TransactionRequest(
@@ -44,14 +43,6 @@ data class TransactionResponse(
 data class BalanceResponse(val accountId: String, val balance: Double)
 
 interface TransactionApi {
-
-    @GET("api/transactions")
-    suspend fun list(
-        @Query("accountId") accountId: String? = null,
-        @Query("categoryId") categoryId: String? = null,
-        @Query("dateFrom") dateFrom: String? = null,
-        @Query("dateTo") dateTo: String? = null
-    ): List<TransactionResponse>
 
     @POST("api/transactions")
     suspend fun create(@Body request: TransactionRequest): TransactionResponse
