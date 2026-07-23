@@ -1,5 +1,6 @@
 package com.walletapp.android.transactions.ui
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -13,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
@@ -28,7 +30,10 @@ fun DatePickerField(label: String, date: String?, onDateSelected: (String) -> Un
     }
 
     if (showDialog) {
-        val datePickerState = rememberDatePickerState()
+        // Se arranca con la fecha ya seleccionada (si hay) en vez de siempre el día de hoy — se
+        // recalcula cada vez que se reabre el diálogo porque este bloque completo entra y sale de
+        // composición junto con showDialog.
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date?.toEpochMillisUtc())
         DatePickerDialog(
             onDismissRequest = { showDialog = false },
             confirmButton = {
@@ -41,10 +46,19 @@ fun DatePickerField(label: String, date: String?, onDateSelected: (String) -> Un
                 }) { Text("Aceptar") }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
+                Row {
+                    TextButton(onClick = {
+                        onDateSelected(LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE))
+                        showDialog = false
+                    }) { Text("Hoy") }
+                    TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
+                }
             }
         ) {
             DatePicker(state = datePickerState)
         }
     }
 }
+
+private fun String.toEpochMillisUtc(): Long =
+    LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
