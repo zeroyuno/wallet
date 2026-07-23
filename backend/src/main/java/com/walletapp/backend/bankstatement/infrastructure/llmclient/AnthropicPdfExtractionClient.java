@@ -22,14 +22,15 @@ import java.util.List;
 /**
  * Adaptador hacia la API de Mensajes de Anthropic (research.md #1, #1b). Manda el PDF completo como
  * documento y fuerza tool-use (`tool_choice`) para garantizar una respuesta JSON contra un schema
- * fijo, en vez de parsear texto libre. Modelo: Claude Haiku 4.5 — suficiente para extracción
- * estructurada de una tabla, mucho más barato que Sonnet/Opus para esta tarea puntual.
+ * fijo, en vez de parsear texto libre. Modelo: Claude Sonnet 5 — se probó primero con Haiku 4.5 por
+ * costo, pero Haiku confundía la asociación fila-columna cuando dos movimientos compartían fecha y
+ * monto (research.md #8); Sonnet lee la tabla con más precisión a cambio de ~2x el costo por PDF.
  */
 @Component
 class AnthropicPdfExtractionClient implements PdfExtractionGateway {
 
     private static final String BASE_URL = "https://api.anthropic.com";
-    private static final String MODEL = "claude-haiku-4-5-20251001";
+    private static final String MODEL = "claude-sonnet-5";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final int MAX_TOKENS = 8192;
 

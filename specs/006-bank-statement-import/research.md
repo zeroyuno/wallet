@@ -18,21 +18,29 @@ LLM).
 
 ## 1b. Qué modelo usar
 
-**Decision**: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`), no Sonnet ni Opus.
+**Decision (revisada)**: Claude Sonnet 5 (`claude-sonnet-5`). Se empezó con Haiku 4.5
+(`claude-haiku-4-5-20251001`) por costo, pero se cambió a Sonnet tras validación manual (ver más abajo).
 
-**Rationale**: es extracción estructurada de una tabla (leer filas de un documento y devolver JSON),
-no una tarea que requiera razonamiento profundo — Haiku alcanza de sobra y es varias veces más barato.
-Precios reales verificados (claude.com/pricing, julio 2026): Haiku 4.5 $1/MTok input, $5/MTok output
-vs. Sonnet 5 $2/MTok input, $10/MTok output. Estimado por PDF (un estado de cuenta de 2-6 páginas,
-~7.000-13.000 tokens de entrada por el documento + overhead de tool-use, ~1.500-2.500 tokens de
-salida por el JSON de movimientos): **~$0.02 por PDF con Haiku** (~$0.04 con Sonnet). Para un volumen
-de uso personal (decenas a un par de cientos de PDFs históricos, luego 1-2 por mes) el costo total es
-de unos pocos dólares, no un factor limitante — igual se documenta acá para que quede explícito y
-sea fácil de re-evaluar si el volumen creciera.
+**Rationale original**: es extracción estructurada de una tabla (leer filas de un documento y devolver
+JSON), no una tarea que requiera razonamiento profundo — Haiku alcanza de sobra y es varias veces más
+barato. Precios reales verificados (claude.com/pricing, julio 2026): Haiku 4.5 $1/MTok input, $5/MTok
+output vs. Sonnet 5 $2/MTok input, $10/MTok output. Estimado por PDF (un estado de cuenta de 2-6
+páginas, ~7.000-13.000 tokens de entrada por el documento + overhead de tool-use, ~1.500-2.500 tokens
+de salida por el JSON de movimientos): **~$0.02 por PDF con Haiku** (~$0.04 con Sonnet).
 
-**Alternatives considered**: Sonnet 5 — descartado por ahora por ser 2-2.5x más caro sin necesidad
-para esta tarea puntual; se puede reconsiderar si la calidad de extracción con Haiku resulta
-insuficiente en la práctica (T026, validación manual).
+**Corrección tras validación manual (T026, segunda ronda)**: con el rediseño de detección de tipo por
+encabezados de columna (ver #8 más abajo), Haiku bajó los errores de 3/49 a 2/49 filas — pero las 2
+restantes eran un caso distinto: dos movimientos con la **misma fecha y el mismo monto**
+("Pago YAPE de 19270" e "PLIN-FERNANDO ALON", ambos 2025-03-10, 25.0), donde Haiku intercambió a cuál
+fila correspondía cada tipo/descripción — un error de asociación fila-columna al leer la tabla
+visualmente, no de lógica de encabezados. Dado que el volumen de uso es bajo (estados de cuenta
+esporádicos, no un flujo de alto volumen), el costo extra de Sonnet (~2x, unos pocos dólares en total)
+es aceptable a cambio de mejor precisión en la lectura de tablas con filas ambiguas.
+
+**Alternatives considered**: Haiku 4.5 — más barato y suficiente para la mayoría de los casos, pero
+demostró errores de asociación fila-columna en casos borde (montos duplicados en la misma fecha) que
+no se resuelven con mejoras de prompt, al ser un problema de lectura visual de la tabla y no de
+instrucción.
 
 **Alternatives considered (extracción de texto)**: extraer texto con Apache PDFBox y mandar el texto
 plano al LLM —
