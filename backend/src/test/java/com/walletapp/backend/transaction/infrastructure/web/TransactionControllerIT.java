@@ -312,7 +312,8 @@ class TransactionControllerIT {
                 .andExpect(jsonPath("$.upserts.length()").value(1))
                 .andExpect(jsonPath("$.upserts[0].amount").value(30))
                 .andExpect(jsonPath("$.deletedIds.length()").value(0))
-                .andExpect(jsonPath("$.hasMore").value(false));
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.totalRemaining").value(1));
     }
 
     // Un cursor ya avanzado (nextSince de una corrida previa) solo trae lo creado/editado después.

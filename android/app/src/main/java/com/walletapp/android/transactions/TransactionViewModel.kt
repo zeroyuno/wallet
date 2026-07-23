@@ -22,7 +22,9 @@ private const val TAG = "TransactionViewModel"
 
 sealed interface SyncUiState {
     data object Idle : SyncUiState
-    data object Syncing : SyncUiState
+    // total=0 significa "todavía no se sabe cuánto falta" (antes de recibir la primera página) — la
+    // UI solo muestra la barra de progreso cuando total > 0 (research.md #8 de la feature 007).
+    data class Syncing(val imported: Int = 0, val total: Int = 0) : SyncUiState
     data class Error(val message: String) : SyncUiState
 }
 
@@ -58,8 +60,12 @@ class TransactionViewModel @Inject constructor(
     // "pull to refresh"; los resultados llegan a la UI vía el Flow de `transactions`, no acá.
     fun sync() {
         viewModelScope.launch {
-            _syncState.value = SyncUiState.Syncing
-            runCatching { transactionSyncEngine.pull() }
+            _syncState.value = SyncUiState.Syncing()
+            runCatching {
+                transactionSyncEngine.pull { imported, total ->
+                    _syncState.value = SyncUiState.Syncing(imported, total)
+                }
+            }
                 .onSuccess {
                     Log.d(TAG, "sync() -> OK")
                     _syncState.value = SyncUiState.Idle

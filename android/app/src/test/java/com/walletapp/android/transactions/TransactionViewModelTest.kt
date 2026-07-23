@@ -63,7 +63,7 @@ private class FakeTransactionApi : TransactionApi {
 }
 
 private class FakeTransactionSyncApi : TransactionSyncApi {
-    var response = TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false)
+    var response = TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false, 0)
     var error: Throwable? = null
 
     override suspend fun sync(since: String?, limit: Int?): TransactionSyncResponse {
@@ -174,7 +174,7 @@ class TransactionViewModelTest {
     @Test
     fun `initial sync populates the paged list`() = runTest {
         val syncApi = FakeTransactionSyncApi().apply {
-            response = TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", false)
+            response = TransactionSyncResponse(listOf(syncItem("t1")), emptyList(), "cursor-1", false, 1)
         }
         val viewModel = newViewModel(syncApi = syncApi)
 

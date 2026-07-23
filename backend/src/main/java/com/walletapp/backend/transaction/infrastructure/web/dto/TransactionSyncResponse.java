@@ -5,5 +5,5 @@ import java.util.List;
 import java.util.UUID;
 
 public record TransactionSyncResponse(List<TransactionSyncItemResponse> upserts, List<UUID> deletedIds,
-                                       Instant nextSince, boolean hasMore) {
+                                       Instant nextSince, boolean hasMore, long totalRemaining) {
 }

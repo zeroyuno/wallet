@@ -23,7 +23,7 @@ private class RunnerFakeTransactionSyncApi : TransactionSyncApi {
     var error: Throwable? = null
     override suspend fun sync(since: String?, limit: Int?): TransactionSyncResponse {
         error?.let { throw it }
-        return TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false)
+        return TransactionSyncResponse(emptyList(), emptyList(), "cursor-0", false, 0)
     }
 }
 

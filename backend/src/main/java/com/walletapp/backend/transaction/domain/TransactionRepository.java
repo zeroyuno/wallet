@@ -32,4 +32,10 @@ public interface TransactionRepository {
     List<Transaction> findChangedSince(UUID userId, Instant since, int limit);
 
     List<DeletedTransactionTombstone> findDeletedSince(UUID userId, Instant since, int limit);
+
+    // Cantidad total de cambios desde `since` (sin paginar) — usado solo para mostrar una barra de
+    // progreso en el cliente ("258/1000"), no para la paginación en sí.
+    long countChangedSince(UUID userId, Instant since);
+
+    long countDeletedSince(UUID userId, Instant since);
 }

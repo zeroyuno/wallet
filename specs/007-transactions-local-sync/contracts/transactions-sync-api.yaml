@@ -76,3 +76,8 @@ components:
           type: boolean
           description: Si quedan más cambios más allá de esta página (el cliente debe seguir
             pidiendo hasta que sea false).
+        totalRemaining:
+          type: integer
+          format: int64
+          description: Total de cambios pendientes desde el `since` de este pedido (no solo esta
+            página) — para que el cliente pueda mostrar una barra de progreso. No se usa para paginar.

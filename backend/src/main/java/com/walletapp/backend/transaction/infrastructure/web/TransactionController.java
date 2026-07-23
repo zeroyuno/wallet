@@ -121,7 +121,8 @@ public class TransactionController {
         List<TransactionSyncItemResponse> upserts = result.upserts().stream()
                 .map(TransactionController::toSyncItemResponse)
                 .toList();
-        return new TransactionSyncResponse(upserts, result.deletedIds(), result.nextSince(), result.hasMore());
+        return new TransactionSyncResponse(upserts, result.deletedIds(), result.nextSince(), result.hasMore(),
+                result.totalRemaining());
     }
 
     private static TransactionSyncItemResponse toSyncItemResponse(TransactionSyncItemView view) {

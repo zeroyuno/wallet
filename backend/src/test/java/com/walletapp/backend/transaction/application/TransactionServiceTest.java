@@ -385,6 +385,23 @@ class TransactionServiceTest {
         assertThat(result.nextSince()).isEqualTo(t1);
     }
 
+    // totalRemaining es para la barra de progreso del cliente ("258/1000") — se calcula sobre TODO lo
+    // pendiente desde `since` (no solo la página actual), independiente del `limit` pedido.
+    @Test
+    void syncReportsTotalRemainingIndependentOfThePageLimit() {
+        Instant since = Instant.now();
+        when(transactionRepository.findChangedSince(eq(userId), eq(since), anyInt()))
+                .thenReturn(List.of(transactionWithUpdatedAt(UUID.randomUUID(), since.plusSeconds(1))));
+        when(transactionRepository.findDeletedSince(eq(userId), eq(since), anyInt())).thenReturn(List.of());
+        when(transactionRepository.countChangedSince(userId, since)).thenReturn(950L);
+        when(transactionRepository.countDeletedSince(userId, since)).thenReturn(50L);
+
+        TransactionService service = new TransactionService(transactionRepository, accountService, categoryService);
+        TransactionSyncResult result = service.sync(userId, since, 1);
+
+        assertThat(result.totalRemaining()).isEqualTo(1000L);
+    }
+
     private Transaction transactionWithUpdatedAt(UUID id, Instant updatedAt) {
         return Transaction.reconstitute(TransactionId.of(id), userId, TransactionType.EXPENSE, new BigDecimal("10"),
                 LocalDate.of(2026, 1, 1), null, accountId, null, updatedAt, updatedAt, null, null, null, null,
