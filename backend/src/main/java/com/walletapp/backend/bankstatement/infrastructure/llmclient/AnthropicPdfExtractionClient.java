@@ -50,8 +50,8 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
                     "properties": {
                       "date": {"type": "string", "description": "Fecha del movimiento, formato ISO 8601 YYYY-MM-DD"},
                       "amount": {"type": "number", "description": "Magnitud del monto, siempre positiva"},
-                      "source_column": {"type": "string", "description": "Texto EXACTO del encabezado de la columna en la que aparece el monto de este movimiento en el documento (ej. 'Cargo', 'Abono', 'Débito', 'Crédito', 'Retiro', 'Depósito'). Dejar como string vacío si el documento no separa los movimientos en columnas de este tipo."},
-                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"], "description": "Si source_column no está vacío, DEBE ser consistente con esa columna (cargo/débito/retiro -> EXPENSE, abono/crédito/depósito -> INCOME). Si source_column está vacío, inferilo de la descripción."},
+                      "source_column": {"type": "string", "description": "Texto EXACTO y COMPLETO del encabezado de la columna en la que aparece el monto de este movimiento en el documento, sin recortarlo (ej. si el header es 'CARGOS / DEBE', copiar 'CARGOS / DEBE' completo, no solo 'DEBE'). Dejar como string vacío si el documento no separa los movimientos en columnas de este tipo."},
+                      "type": {"type": "string", "enum": ["INCOME", "EXPENSE"], "description": "Si source_column no está vacío, DEBE ser consistente con esa columna (cargo/débito/retiro/debe -> EXPENSE, abono/crédito/depósito/haber -> INCOME). Si source_column está vacío, inferilo de la descripción."},
                       "description": {"type": "string", "description": "Descripción o concepto del movimiento"}
                     },
                     "required": ["date", "amount", "source_column", "type", "description"]
@@ -78,10 +78,11 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
             + "gasto, y una descripción breve) y llamá a la herramienta " + TOOL_NAME + " con la lista "
             + "completa. "
             + "Para cada movimiento, ANTES de decidir el tipo, fijate en qué columna del documento "
-            + "aparece el monto y anotalo literalmente en source_column (ej. 'Cargo', 'Abono'). Recién "
-            + "después, con eso ya identificado, asigná el tipo: un monto en una columna de "
-            + "cargo/débito/retiro es EXPENSE, uno en abono/crédito/depósito es INCOME — esto vale "
-            + "SIEMPRE que el documento tenga esa separación en columnas, sin importar lo que sugiera "
+            + "aparece el monto y copiá el encabezado completo tal cual en source_column, sin recortarlo "
+            + "(ej. si el header dice 'CARGOS / DEBE', copiá 'CARGOS / DEBE' entero, no solo una parte). "
+            + "Recién después, con eso ya identificado, asigná el tipo: un monto en una columna de "
+            + "cargo/débito/retiro/debe es EXPENSE, uno en abono/crédito/depósito/haber es INCOME — esto "
+            + "vale SIEMPRE que el documento tenga esa separación en columnas, sin importar lo que sugiera "
             + "el texto de la descripción (ej. una fila que dice \"Pago YAPE de X\" en la columna de "
             + "abonos es INCOME, no EXPENSE, aunque la palabra \"Pago\" sugiera lo contrario). Prestá "
             + "atención fila por fila: no asumas el tipo de una fila por otras filas con descripción "
@@ -173,10 +174,13 @@ class AnthropicPdfExtractionClient implements PdfExtractionGateway {
     // es un ingreso pese a la palabra "Pago"). Si la columna reportada matchea un término bancario
     // conocido, esa columna manda sobre el type del modelo; si no matchea nada (documento sin
     // columnas separadas), se respeta el type que ya infirió el modelo por descripción.
+    // "debe"/"haber" son terminología contable (muy usada en Perú/LatAm) — headers combinados como
+    // "CARGOS / DEBE" o "ABONOS / HABER" pueden hacer que el modelo declare solo la segunda mitad en
+    // source_column (ej. "DEBE" a secas), así que ambas variantes tienen que estar reconocidas.
     private static final Set<String> INCOME_COLUMN_KEYWORDS = Set.of("abono", "credito", "crédito", "deposito",
-            "depósito", "ingreso");
+            "depósito", "ingreso", "haber");
     private static final Set<String> EXPENSE_COLUMN_KEYWORDS = Set.of("cargo", "debito", "débito", "retiro",
-            "egreso");
+            "egreso", "debe");
 
     private static String resolveType(String modelType, String sourceColumn) {
         String normalized = sourceColumn == null ? "" : sourceColumn.toLowerCase().trim();

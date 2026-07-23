@@ -152,3 +152,13 @@ corrección en código — insuficiente, es justo lo que falló en la validació
 únicamente en la corrección por palabra clave sin pedirle al modelo que declare la columna — más
 frágil, porque dependería de que el código adivinara el nombre de columna sin que el modelo lo haya
 leído explícitamente del documento.
+
+**Segunda ronda de validación**: con `source_column` agregado, 1 de 2 casos previamente mal
+clasificados se corrigió solo; el otro ("Pago YAPE de X") seguía fallando. Causa: el estado de cuenta
+real del usuario tiene headers combinados en terminología contable —
+`"CARGOS / DEBE"` / `"ABONOS / HABER"` (común en Perú/LatAm) — y el modelo aparentemente declaraba
+solo la segunda mitad del header (`"DEBE"`/`"HABER"` sueltos) en `source_column`, que no estaba en la
+lista de palabras clave (solo tenía cargo/abono/débito/crédito/depósito/retiro). Se agregan
+`"debe"`/`"haber"` a las listas de palabras clave, y se instruye explícitamente al modelo (prompt y
+schema) a copiar el encabezado de columna COMPLETO sin recortarlo, para reducir la chance de que esto
+se repita con otro banco que use una tercera terminología no contemplada todavía.
