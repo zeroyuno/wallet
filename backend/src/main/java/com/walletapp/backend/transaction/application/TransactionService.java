@@ -120,6 +120,16 @@ public class TransactionService {
         return transactionRepository.save(transaction).id().value();
     }
 
+    // Método de escritura genérico para otros bounded contexts que importan movimientos desde una
+    // fuente externa sin los campos propios de Wallet (ej. bankstatement) — delega en el mismo
+    // mecanismo de arriba, sin filtrar nombres de campo (ej. walletTransferId) ajenos a la fuente
+    // real de los datos en cada call site (plan.md de la feature 006, Complexity Tracking).
+    public UUID createFromImportedTransaction(UUID userId, String transactionTypeName, BigDecimal amount,
+                                               LocalDate date, String description, UUID accountId, UUID categoryId) {
+        return createFromExternalImport(userId, transactionTypeName, amount, date, description, accountId,
+                categoryId, null, null, null, null, Set.of());
+    }
+
     private void validateAccount(UUID userId, UUID accountId) {
         if (!accountService.existsOwnedByUser(userId, accountId)) {
             throw new InvalidTransactionAccountException("Account not found or not owned: " + accountId);
