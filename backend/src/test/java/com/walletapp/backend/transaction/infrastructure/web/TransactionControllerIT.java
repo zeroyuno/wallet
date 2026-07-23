@@ -294,4 +294,97 @@ class TransactionControllerIT {
         mockMvc.perform(get("/api/transactions").header("Authorization", "Bearer " + token))
                 .andExpect(jsonPath("$.length()").value(2));
     }
+
+    // Feature 007: GET /api/transactions/sync trae, sin cursor, todo lo que ya existe.
+    @Test
+    void syncWithoutCursorReturnsExistingTransactions() throws Exception {
+        String token = registerAndLogin("tx-sync-full@example.com");
+        String accountId = createAccount(token, 100);
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":30,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/transactions/sync").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.upserts.length()").value(1))
+                .andExpect(jsonPath("$.upserts[0].amount").value(30))
+                .andExpect(jsonPath("$.deletedIds.length()").value(0))
+                .andExpect(jsonPath("$.hasMore").value(false));
+    }
+
+    // Un cursor ya avanzado (nextSince de una corrida previa) solo trae lo creado/editado después.
+    @Test
+    void syncWithCursorReturnsOnlyChangesSinceThatPoint() throws Exception {
+        String token = registerAndLogin("tx-sync-delta@example.com");
+        String accountId = createAccount(token, 100);
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":10,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andExpect(status().isCreated());
+
+        String firstSyncResponse = mockMvc.perform(get("/api/transactions/sync")
+                        .header("Authorization", "Bearer " + token))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = com.jayway.jsonpath.JsonPath.read(firstSyncResponse, "$.nextSince");
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":20,\"date\":\"2026-07-19\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/transactions/sync?since=" + cursor).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.upserts.length()").value(1))
+                .andExpect(jsonPath("$.upserts[0].amount").value(20));
+    }
+
+    // Un borrado aparece en deletedIds del feed de sincronización (research.md #2 de la feature 007).
+    @Test
+    void syncReportsDeletedTransactionIds() throws Exception {
+        String token = registerAndLogin("tx-sync-delete@example.com");
+        String accountId = createAccount(token, 100);
+
+        String createResponse = mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":30,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String txId = com.jayway.jsonpath.JsonPath.read(createResponse, "$.id");
+
+        String firstSyncResponse = mockMvc.perform(get("/api/transactions/sync")
+                        .header("Authorization", "Bearer " + token))
+                .andReturn().getResponse().getContentAsString();
+        String cursor = com.jayway.jsonpath.JsonPath.read(firstSyncResponse, "$.nextSince");
+
+        mockMvc.perform(delete("/api/transactions/" + txId).header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/transactions/sync?since=" + cursor).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedIds.length()").value(1))
+                .andExpect(jsonPath("$.deletedIds[0]").value(txId))
+                .andExpect(jsonPath("$.upserts.length()").value(0));
+    }
+
+    @Test
+    void syncIsIsolatedBetweenUsers() throws Exception {
+        String ownerToken = registerAndLogin("tx-sync-iso-a@example.com");
+        String otherToken = registerAndLogin("tx-sync-iso-b@example.com");
+        String accountId = createAccount(ownerToken, 100);
+
+        mockMvc.perform(post("/api/transactions").header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"amount\":30,\"date\":\"2026-07-18\","
+                                + "\"accountId\":\"" + accountId + "\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/transactions/sync").header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.upserts.length()").value(0));
+    }
 }

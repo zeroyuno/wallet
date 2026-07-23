@@ -4,8 +4,11 @@ import com.walletapp.backend.account.application.AccountService;
 import com.walletapp.backend.account.application.CategoryService;
 import com.walletapp.backend.transaction.application.dto.TransactionCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionFilter;
+import com.walletapp.backend.transaction.application.dto.TransactionSyncItemView;
+import com.walletapp.backend.transaction.application.dto.TransactionSyncResult;
 import com.walletapp.backend.transaction.application.dto.TransactionUpdateCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionView;
+import com.walletapp.backend.transaction.domain.DeletedTransactionTombstone;
 import com.walletapp.backend.transaction.domain.Transaction;
 import com.walletapp.backend.transaction.domain.TransactionId;
 import com.walletapp.backend.transaction.domain.TransactionRepository;
@@ -19,7 +22,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -77,6 +83,66 @@ public class TransactionService {
     public void delete(UUID userId, TransactionId id) {
         findOwned(userId, id);
         transactionRepository.deleteByIdAndUserId(id, userId);
+    }
+
+    private static final int DEFAULT_SYNC_LIMIT = 200;
+    private static final int MAX_SYNC_LIMIT = 500;
+
+    // Feed de sincronización incremental (feature 007, research.md #1): combina creados/editados y
+    // eliminados desde `since` en un único orden (updatedAt/deletedAt ascendente, desempate por id).
+    // Pide `limit + 1` a cada fuente para saber si hay más allá de esta página sin necesitar un COUNT
+    // aparte (el elemento extra, si aparece, solo se usa para calcular hasMore, no se devuelve).
+    public TransactionSyncResult sync(UUID userId, Instant since, Integer requestedLimit) {
+        Instant effectiveSince = since == null ? Instant.EPOCH : since;
+        int limit = resolveSyncLimit(requestedLimit);
+        int fetchLimit = limit + 1;
+
+        List<Transaction> changed = transactionRepository.findChangedSince(userId, effectiveSince, fetchLimit);
+        List<DeletedTransactionTombstone> deleted = transactionRepository.findDeletedSince(userId, effectiveSince,
+                fetchLimit);
+
+        List<SyncCandidate> merged = new ArrayList<>();
+        for (Transaction t : changed) {
+            merged.add(new SyncCandidate(t.updatedAt(), t.id().value(), t, null));
+        }
+        for (DeletedTransactionTombstone d : deleted) {
+            merged.add(new SyncCandidate(d.deletedAt(), d.id(), null, d));
+        }
+        merged.sort(Comparator.comparing(SyncCandidate::timestamp).thenComparing(SyncCandidate::id));
+
+        boolean hasMore = merged.size() > limit;
+        List<SyncCandidate> page = merged.subList(0, Math.min(limit, merged.size()));
+
+        List<TransactionSyncItemView> upserts = page.stream()
+                .filter(c -> c.upsert() != null)
+                .map(c -> toSyncItemView(c.upsert()))
+                .toList();
+        List<UUID> deletedIds = page.stream()
+                .filter(c -> c.tombstone() != null)
+                .map(c -> c.tombstone().id())
+                .toList();
+        Instant nextSince = page.isEmpty() ? effectiveSince : page.get(page.size() - 1).timestamp();
+
+        return new TransactionSyncResult(upserts, deletedIds, nextSince, hasMore);
+    }
+
+    private static int resolveSyncLimit(Integer requestedLimit) {
+        if (requestedLimit == null || requestedLimit <= 0) {
+            return DEFAULT_SYNC_LIMIT;
+        }
+        return Math.min(requestedLimit, MAX_SYNC_LIMIT);
+    }
+
+    private record SyncCandidate(Instant timestamp, UUID id, Transaction upsert, DeletedTransactionTombstone
+            tombstone) {
+    }
+
+    private static TransactionSyncItemView toSyncItemView(Transaction transaction) {
+        return new TransactionSyncItemView(transaction.id().value(), transaction.type(), transaction.amount(),
+                transaction.date(), transaction.description().orElse(null), transaction.accountId(),
+                transaction.categoryId().orElse(null), transaction.counterParty().orElse(null),
+                transaction.paymentType().orElse(null), transaction.recordState().orElse(null),
+                transaction.walletTransferId().orElse(null), transaction.labels(), transaction.updatedAt());
     }
 
     private Transaction findOwned(UUID userId, TransactionId id) {

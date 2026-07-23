@@ -21,6 +21,9 @@ public final class Transaction {
     private final UUID accountId;
     private UUID categoryId;
     private final Instant createdAt;
+    // updatedAt (feature 007): = createdAt al crear, se actualiza en cada update(). Es el campo por el
+    // que ordena/pagina el feed de sincronización incremental (ver research.md #1 de la feature 007).
+    private Instant updatedAt;
     // Campos de solo lectura poblados al importar desde BudgetBakers Wallet (feature 005) — no
     // editables vía update(), ausentes (null/vacío) en una transacción creada manualmente.
     private final String counterParty;
@@ -30,7 +33,7 @@ public final class Transaction {
     private final Set<String> labels;
 
     private Transaction(TransactionId id, UUID userId, TransactionType type, BigDecimal amount, LocalDate date,
-                         String description, UUID accountId, UUID categoryId, Instant createdAt,
+                         String description, UUID accountId, UUID categoryId, Instant createdAt, Instant updatedAt,
                          String counterParty, String paymentType, String recordState, String walletTransferId,
                          Set<String> labels) {
         this.id = id;
@@ -42,6 +45,7 @@ public final class Transaction {
         this.accountId = accountId;
         this.categoryId = categoryId;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
         this.counterParty = counterParty;
         this.paymentType = paymentType;
         this.recordState = recordState;
@@ -67,17 +71,20 @@ public final class Transaction {
                                       String walletTransferId, Set<String> labels) {
         requirePositiveAmount(amount);
         requireNonNull(date, "date");
+        Instant now = Instant.now();
         return new Transaction(id.orElseGet(TransactionId::newId), userId, type, amount, date, description,
-                accountId, categoryId, Instant.now(), counterParty, paymentType, recordState, walletTransferId,
+                accountId, categoryId, now, now, counterParty, paymentType, recordState, walletTransferId,
                 labels == null ? Set.of() : labels);
     }
 
     public static Transaction reconstitute(TransactionId id, UUID userId, TransactionType type, BigDecimal amount,
                                             LocalDate date, String description, UUID accountId, UUID categoryId,
-                                            Instant createdAt, String counterParty, String paymentType,
-                                            String recordState, String walletTransferId, Set<String> labels) {
+                                            Instant createdAt, Instant updatedAt, String counterParty,
+                                            String paymentType, String recordState, String walletTransferId,
+                                            Set<String> labels) {
         return new Transaction(id, userId, type, amount, date, description, accountId, categoryId, createdAt,
-                counterParty, paymentType, recordState, walletTransferId, labels == null ? Set.of() : labels);
+                updatedAt, counterParty, paymentType, recordState, walletTransferId,
+                labels == null ? Set.of() : labels);
     }
 
     // type y accountId son inmutables tras la creación (FR-005, ver research.md).
@@ -88,6 +95,7 @@ public final class Transaction {
         this.date = date;
         this.description = description;
         this.categoryId = categoryId;
+        this.updatedAt = Instant.now();
     }
 
     private static void requirePositiveAmount(BigDecimal amount) {
@@ -136,6 +144,10 @@ public final class Transaction {
 
     public Instant createdAt() {
         return createdAt;
+    }
+
+    public Instant updatedAt() {
+        return updatedAt;
     }
 
     public Optional<String> counterParty() {

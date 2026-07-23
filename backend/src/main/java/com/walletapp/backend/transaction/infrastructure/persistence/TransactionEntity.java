@@ -51,6 +51,9 @@ public class TransactionEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
     @Column(name = "counter_party")
     private String counterParty;
 
@@ -76,7 +79,7 @@ public class TransactionEntity {
 
     public TransactionEntity(UUID id, UUID userId, TransactionType type, BigDecimal amount, LocalDate date,
                               String description, UUID accountId, UUID categoryId, Instant createdAt,
-                              String counterParty, String paymentType, String recordState,
+                              Instant updatedAt, String counterParty, String paymentType, String recordState,
                               String walletTransferId, Set<LabelEntity> labels) {
         this.id = id;
         this.userId = userId;
@@ -87,6 +90,7 @@ public class TransactionEntity {
         this.accountId = accountId;
         this.categoryId = categoryId;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
         this.counterParty = counterParty;
         this.paymentType = paymentType;
         this.recordState = recordState;
@@ -128,6 +132,10 @@ public class TransactionEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public String getCounterParty() {

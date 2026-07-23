@@ -10,18 +10,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,16 +29,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.walletapp.android.accounts.AccountViewModel
 import com.walletapp.android.accounts.AccountsUiState
 import com.walletapp.android.categories.CategoriesUiState
 import com.walletapp.android.categories.CategoryType
 import com.walletapp.android.categories.CategoryViewModel
 import com.walletapp.android.categories.displayLabel
+import com.walletapp.android.transactions.SyncUiState
 import com.walletapp.android.transactions.TransactionFilter
 import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.TransactionViewModel
-import com.walletapp.android.transactions.TransactionsUiState
 
 @Composable
 fun TransactionListScreen(
@@ -49,7 +50,9 @@ fun TransactionListScreen(
     accountViewModel: AccountViewModel = hiltViewModel(),
     categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val currentFilter by viewModel.filter.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
+    val transactions = viewModel.transactions.collectAsLazyPagingItems()
     val accountsState by accountViewModel.uiState.collectAsState()
     val categoriesState by categoryViewModel.uiState.collectAsState()
     val accounts = (accountsState as? AccountsUiState.Success)?.accounts.orEmpty().map { it.account }
@@ -65,8 +68,6 @@ fun TransactionListScreen(
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp)) {
             Text(text = "Mis movimientos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
-
-            val currentFilter = (state as? TransactionsUiState.Success)?.filter ?: TransactionFilter()
 
             if (accounts.isNotEmpty()) {
                 Text(text = "Filtrar por cuenta", style = MaterialTheme.typography.labelLarge)
@@ -134,23 +135,35 @@ fun TransactionListScreen(
             }
             Spacer(modifier = Modifier.height(8.dp))
 
-            when (val current = state) {
-                is TransactionsUiState.Loading -> CircularProgressIndicator()
-                is TransactionsUiState.Error -> Text(text = current.message, color = MaterialTheme.colorScheme.error)
-                is TransactionsUiState.Success -> {
-                    if (current.transactions.isEmpty()) {
-                        Text(text = "Todavía no tenés movimientos. Tocá + para registrar el primero.")
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(current.transactions, key = { it.id }) { transaction ->
-                                val category = categories.find { it.id == transaction.categoryId }
-                                TransactionRow(
-                                    transaction = transaction,
-                                    accountName = accounts.find { it.id == transaction.accountId }?.name,
-                                    categoryName = category?.name,
-                                    onClick = { onEditTransaction(transaction) }
-                                )
-                            }
+            if (syncState is SyncUiState.Error) {
+                Text(
+                    text = (syncState as SyncUiState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // La lista siempre viene de la caché local (Room) — el pull-to-refresh solo dispara una
+            // sincronización en segundo plano, no bloquea ni reemplaza lo que ya se ve (feature 007, US1).
+            PullToRefreshBox(
+                isRefreshing = syncState is SyncUiState.Syncing,
+                onRefresh = { viewModel.sync() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (transactions.itemCount == 0) {
+                    Text(text = "Todavía no tenés movimientos. Tocá + para registrar el primero.")
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(count = transactions.itemCount, key = transactions.itemKey { it.id }) { index ->
+                            val transaction = transactions[index] ?: return@items
+                            val category = categories.find { it.id == transaction.categoryId }
+                            TransactionRow(
+                                transaction = transaction,
+                                accountName = accounts.find { it.id == transaction.accountId }?.name,
+                                categoryName = category?.name,
+                                onClick = { onEditTransaction(transaction) }
+                            )
                         }
                     }
                 }

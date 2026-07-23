@@ -4,11 +4,15 @@ import com.walletapp.backend.shared.security.AuthenticatedUser;
 import com.walletapp.backend.transaction.application.TransactionService;
 import com.walletapp.backend.transaction.application.dto.TransactionCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionFilter;
+import com.walletapp.backend.transaction.application.dto.TransactionSyncItemView;
+import com.walletapp.backend.transaction.application.dto.TransactionSyncResult;
 import com.walletapp.backend.transaction.application.dto.TransactionUpdateCommand;
 import com.walletapp.backend.transaction.application.dto.TransactionView;
 import com.walletapp.backend.transaction.domain.TransactionId;
 import com.walletapp.backend.transaction.infrastructure.web.dto.TransactionRequest;
 import com.walletapp.backend.transaction.infrastructure.web.dto.TransactionResponse;
+import com.walletapp.backend.transaction.infrastructure.web.dto.TransactionSyncItemResponse;
+import com.walletapp.backend.transaction.infrastructure.web.dto.TransactionSyncResponse;
 import com.walletapp.backend.transaction.infrastructure.web.dto.TransactionUpdateRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -27,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -87,6 +92,15 @@ public class TransactionController {
         transactionService.delete(principal.id(), TransactionId.of(id));
     }
 
+    @GetMapping("/sync")
+    public TransactionSyncResponse sync(@AuthenticationPrincipal AuthenticatedUser principal,
+                                         @RequestParam(required = false) Instant since,
+                                         @RequestParam(required = false) Integer limit) {
+        log.info("GET /api/transactions/sync userId={} since={} limit={}", principal.id(), since, limit);
+        TransactionSyncResult result = transactionService.sync(principal.id(), since, limit);
+        return toSyncResponse(result);
+    }
+
     private static TransactionUpdateCommand toCommand(TransactionUpdateRequest request) {
         return new TransactionUpdateCommand(request.amount(), request.date(), request.description(),
                 request.categoryId());
@@ -101,5 +115,18 @@ public class TransactionController {
         return new TransactionResponse(view.id(), view.type(), view.amount(), view.date(), view.description(),
                 view.accountId(), view.categoryId(), view.counterParty(), view.paymentType(), view.recordState(),
                 view.walletTransferId(), view.labels());
+    }
+
+    private static TransactionSyncResponse toSyncResponse(TransactionSyncResult result) {
+        List<TransactionSyncItemResponse> upserts = result.upserts().stream()
+                .map(TransactionController::toSyncItemResponse)
+                .toList();
+        return new TransactionSyncResponse(upserts, result.deletedIds(), result.nextSince(), result.hasMore());
+    }
+
+    private static TransactionSyncItemResponse toSyncItemResponse(TransactionSyncItemView view) {
+        return new TransactionSyncItemResponse(view.id(), view.type(), view.amount(), view.date(),
+                view.description(), view.accountId(), view.categoryId(), view.counterParty(), view.paymentType(),
+                view.recordState(), view.walletTransferId(), view.labels(), view.updatedAt());
     }
 }
