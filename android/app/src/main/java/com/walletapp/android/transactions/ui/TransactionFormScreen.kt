@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -46,18 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.AccountViewModel
 import com.walletapp.android.accounts.AccountsUiState
 import com.walletapp.android.accounts.displayLabel
 import com.walletapp.android.accounts.emoji
 import com.walletapp.android.categories.CategoriesUiState
-import com.walletapp.android.categories.CategoryResponse
 import com.walletapp.android.categories.CategoryType
 import com.walletapp.android.categories.CategoryViewModel
 import com.walletapp.android.categories.displayLabel
@@ -87,6 +82,7 @@ fun TransactionFormScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var accountMenuExpanded by remember { mutableStateOf(false) }
+    var categoryMenuExpanded by remember { mutableStateOf(false) }
 
     val accountsState by accountViewModel.uiState.collectAsState()
     val categoriesState by categoryViewModel.uiState.collectAsState()
@@ -94,6 +90,7 @@ fun TransactionFormScreen(
     val candidateCategories = (categoriesState as? CategoriesUiState.Success)?.categories.orEmpty()
         .filter { it.type == type }
     val selectedAccount = accounts.find { it.id == accountId }
+    val selectedCategory = candidateCategories.find { it.id == categoryId }
 
     Column(
         modifier = Modifier
@@ -164,7 +161,7 @@ fun TransactionFormScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 BasicTextField(
                     value = amount,
-                    onValueChange = { amount = it },
+                    onValueChange = { new -> if (isValidAmountInput(new)) amount = new },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     textStyle = MaterialTheme.typography.headlineLarge.copy(color = MaterialTheme.colorScheme.onSurface),
@@ -256,22 +253,59 @@ fun TransactionFormScreen(
 
         if (candidateCategories.isNotEmpty()) {
             Text(text = "Categoría (opcional)", style = MaterialTheme.typography.labelLarge)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    CategoryOption(
-                        label = "Ninguna",
-                        emoji = "🚫",
-                        selected = categoryId == null,
-                        onClick = { categoryId = null }
-                    )
+            Box {
+                Surface(
+                    onClick = { categoryMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = selectedCategory?.emoji() ?: "🚫", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Text(
+                            text = selectedCategory?.name ?: "Ninguna",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                items(candidateCategories, key = { it.id }) { category ->
-                    CategoryOption(
-                        label = category.name,
-                        emoji = category.emoji(),
-                        selected = categoryId == category.id,
-                        onClick = { categoryId = category.id }
+                DropdownMenu(expanded = categoryMenuExpanded, onDismissRequest = { categoryMenuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Ninguna") },
+                        onClick = {
+                            categoryId = null
+                            categoryMenuExpanded = false
+                        }
                     )
+                    candidateCategories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category.name) },
+                            onClick = {
+                                categoryId = category.id
+                                categoryMenuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -351,35 +385,14 @@ fun TransactionFormScreen(
     }
 }
 
-@Composable
-private fun CategoryOption(label: String, emoji: String, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier.width(72.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Surface(
-            onClick = onClick,
-            modifier = Modifier.size(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Text(text = emoji, style = MaterialTheme.typography.titleLarge)
-            }
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
-    }
+// El monto se persiste en NUMERIC(28,9) — hasta 19 dígitos enteros y 9 decimales. Se filtra en
+// cada tecleo en vez de validar recién al guardar, para que sea imposible escribir un valor que
+// el backend después rechace.
+private fun isValidAmountInput(value: String): Boolean {
+    if (value.isEmpty()) return true
+    if (!value.matches(Regex("^\\d*\\.?\\d*$"))) return false
+    val parts = value.split(".")
+    val integerPart = parts[0]
+    val decimalPart = parts.getOrNull(1) ?: ""
+    return integerPart.length <= 19 && decimalPart.length <= 9
 }
