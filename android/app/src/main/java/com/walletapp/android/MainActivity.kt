@@ -91,11 +91,18 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
 
     val activeTab = screen.toBottomNavTab()
 
-    // Login y las 3 secciones principales no tienen "atrás" dentro de la app (las secciones
-    // principales son destinos de nivel superior de la barra de navegación — atrás minimiza la app,
-    // mismo criterio estándar de una bottom nav bar). Solo los formularios y Registro tienen un padre
-    // lógico al que volver.
-    BackHandler(enabled = screen != Screen.Login && activeTab == null) {
+    // Login y las 3 secciones principales no tienen "atrás" dentro de la app (son destinos de nivel
+    // superior de la barra de navegación — atrás minimiza la app, mismo criterio estándar de una
+    // bottom nav bar). Solo los formularios y Registro tienen un padre lógico al que volver.
+    // OJO: esto NO puede derivarse de `activeTab == null`, porque toBottomNavTab() mapea los
+    // formularios a la pestaña de su lista padre (para que la barra siga resaltada mientras se
+    // edita) — usar esa condición deshabilitaba el BackHandler justo en los formularios y el back
+    // del sistema terminaba cerrando la app en lugar de volver a la lista.
+    val hasBackDestination = when (screen) {
+        Screen.Login, Screen.AccountsList, Screen.TransactionsList, Screen.CategoriesList -> false
+        Screen.Register, is Screen.AccountForm, is Screen.CategoryForm, is Screen.TransactionForm -> true
+    }
+    BackHandler(enabled = hasBackDestination) {
         screen = when (val current = screen) {
             Screen.Login, Screen.AccountsList, Screen.TransactionsList, Screen.CategoriesList -> screen
             Screen.Register -> Screen.Login
