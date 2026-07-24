@@ -17,14 +17,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,12 +51,17 @@ import com.walletapp.android.transactions.SyncUiState
 import com.walletapp.android.transactions.TransactionFilter
 import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.TransactionViewModel
+import java.time.LocalDate
+import java.time.format.TextStyle
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListScreen(
     onAddTransaction: () -> Unit = {},
     onEditTransaction: (TransactionResponse) -> Unit = {},
+    onLogout: () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
     viewModel: TransactionViewModel = hiltViewModel(),
     accountViewModel: AccountViewModel = hiltViewModel(),
     categoryViewModel: CategoryViewModel = hiltViewModel()
@@ -67,6 +75,17 @@ fun TransactionListScreen(
     val categories = (categoriesState as? CategoriesUiState.Success)?.categories.orEmpty()
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Movimientos") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
+                    }
+                }
+            )
+        },
+        bottomBar = bottomBar,
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTransaction) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar movimiento")
@@ -74,9 +93,6 @@ fun TransactionListScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp)) {
-            Text(text = "Mis movimientos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
-
             if (accounts.isNotEmpty()) {
                 Text(text = "Filtrar por cuenta", style = MaterialTheme.typography.labelLarge)
                 Row(
@@ -178,10 +194,27 @@ fun TransactionListScreen(
                 if (transactions.itemCount == 0) {
                     Text(text = "Todavía no tenés movimientos. Tocá + para registrar el primero.")
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         items(count = transactions.itemCount, key = transactions.itemKey { it.id }) { index ->
                             val transaction = transactions[index] ?: return@items
                             val category = categories.find { it.id == transaction.categoryId }
+                            // Encabezado de fecha (research del diseño de Stitch: "Hoy", "Ayer", fecha) —
+                            // la lista ya viene ordenada por fecha DESC desde Room, así que alcanza con
+                            // comparar contra el ítem anterior sin recalcular sobre toda la colección.
+                            // peek() en vez de operator get() para no disparar carga/tracking de Paging 3
+                            // sobre una fila que no se está por mostrar todavía.
+                            val previousDate = if (index == 0) null else transactions.peek(index - 1)?.date
+                            if (transaction.date != previousDate) {
+                                Text(
+                                    text = formatDateHeader(transaction.date),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp, bottom = 4.dp)
+                                )
+                            }
                             TransactionRow(
                                 transaction = transaction,
                                 accountName = accounts.find { it.id == transaction.accountId }?.name,
@@ -192,6 +225,21 @@ fun TransactionListScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// "Hoy"/"Ayer" o fecha en español (ej. "21 de julio") — mismo criterio de agrupado que el mockup de
+// Stitch ("Today, Oct 24" / "Yesterday, Oct 23" / "Oct 21"), adaptado al idioma de la app.
+private fun formatDateHeader(isoDate: String): String {
+    val date = runCatching { LocalDate.parse(isoDate) }.getOrNull() ?: return isoDate
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "Hoy"
+        today.minusDays(1) -> "Ayer"
+        else -> {
+            val month = date.month.getDisplayName(TextStyle.FULL, Locale("es"))
+            "${date.dayOfMonth} de $month" + if (date.year != today.year) " de ${date.year}" else ""
         }
     }
 }
@@ -210,12 +258,14 @@ private fun TransactionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // secondary = verde (éxito/ingreso), error = rojo (gasto) — roles del sistema de diseño
+            // Midnight FinTech (DESIGN.md), no el color primario genérico de la app.
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isIncome) MaterialTheme.colorScheme.primaryContainer
+                        if (isIncome) MaterialTheme.colorScheme.secondaryContainer
                         else MaterialTheme.colorScheme.errorContainer
                     ),
                 contentAlignment = Alignment.Center
@@ -225,7 +275,7 @@ private fun TransactionRow(
                 Text(
                     text = if (isIncome) "↓" else "↑",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = if (isIncome) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
                 )
             }
             // weight(1f) es lo que evita que un texto largo empuje el monto a un espacio casi nulo
@@ -250,7 +300,7 @@ private fun TransactionRow(
                     String.format(Locale.getDefault(), "%.2f", transaction.amount)
                 }",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (isIncome) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
                 maxLines = 1
             )
         }

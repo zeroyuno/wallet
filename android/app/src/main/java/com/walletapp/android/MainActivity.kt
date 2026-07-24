@@ -5,17 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.walletapp.android.accounts.AccountResponse
 import com.walletapp.android.accounts.ui.AccountFormScreen
@@ -39,9 +37,12 @@ import com.walletapp.android.auth.ui.RegisterScreen
 import com.walletapp.android.categories.CategoryResponse
 import com.walletapp.android.categories.ui.CategoryFormScreen
 import com.walletapp.android.categories.ui.CategoryListScreen
+import com.walletapp.android.navigation.BottomNavTab
+import com.walletapp.android.navigation.toBottomNavTab
 import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.ui.TransactionFormScreen
 import com.walletapp.android.transactions.ui.TransactionListScreen
+import com.walletapp.android.ui.theme.WalletTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -50,21 +51,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
-                Scaffold { innerPadding ->
-                    Surface(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                        WalletApp()
-                    }
+            WalletTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    WalletApp()
                 }
             }
         }
     }
 }
 
-private sealed interface Screen {
+// internal (no private) para que navigation/BottomNavTab.kt pueda mapear Screen -> pestaña activa.
+internal sealed interface Screen {
     data object Login : Screen
     data object Register : Screen
-    data object Home : Screen
     data object AccountsList : Screen
     data class AccountForm(val account: AccountResponse? = null) : Screen
     data object CategoriesList : Screen
@@ -75,6 +74,8 @@ private sealed interface Screen {
 
 @Composable
 private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
+    // Feature 008: se quita Screen.Home (menú manual) — la barra de navegación inferior cubre esas
+    // 3 secciones, y la sesión aterriza directo en Cuentas (research.md #5).
     var screen by remember { mutableStateOf<Screen>(Screen.Login) }
     val sessionState by authViewModel.sessionState.collectAsState()
 
@@ -84,21 +85,29 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { authViewModel.checkSession() }
     LaunchedEffect(sessionState) {
         if (sessionState == SessionCheckState.LoggedIn && screen == Screen.Login) {
-            screen = Screen.Home
+            screen = Screen.AccountsList
         }
     }
 
-    // Login y Home no tienen "atrás" dentro de la app — ahí el botón atrás del sistema
-    // hace lo de siempre (fondo/salir). El resto de las pantallas sí tienen un padre lógico.
-    BackHandler(enabled = screen != Screen.Login && screen != Screen.Home) {
+    val activeTab = screen.toBottomNavTab()
+
+    // Login y las 3 secciones principales no tienen "atrás" dentro de la app (son destinos de nivel
+    // superior de la barra de navegación — atrás minimiza la app, mismo criterio estándar de una
+    // bottom nav bar). Solo los formularios y Registro tienen un padre lógico al que volver.
+    // OJO: esto NO puede derivarse de `activeTab == null`, porque toBottomNavTab() mapea los
+    // formularios a la pestaña de su lista padre (para que la barra siga resaltada mientras se
+    // edita) — usar esa condición deshabilitaba el BackHandler justo en los formularios y el back
+    // del sistema terminaba cerrando la app en lugar de volver a la lista.
+    val hasBackDestination = when (screen) {
+        Screen.Login, Screen.AccountsList, Screen.TransactionsList, Screen.CategoriesList -> false
+        Screen.Register, is Screen.AccountForm, is Screen.CategoryForm, is Screen.TransactionForm -> true
+    }
+    BackHandler(enabled = hasBackDestination) {
         screen = when (val current = screen) {
-            Screen.Login, Screen.Home -> screen
+            Screen.Login, Screen.AccountsList, Screen.TransactionsList, Screen.CategoriesList -> screen
             Screen.Register -> Screen.Login
-            Screen.AccountsList -> Screen.Home
             is Screen.AccountForm -> Screen.AccountsList
-            Screen.CategoriesList -> Screen.Home
             is Screen.CategoryForm -> Screen.CategoriesList
-            Screen.TransactionsList -> Screen.Home
             is Screen.TransactionForm -> Screen.TransactionsList
         }
     }
@@ -110,23 +119,42 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
         return
     }
 
+    // Sin Scaffold acá: cada pantalla principal ya tiene el suyo propio (topBar/FAB/bottomBar).
+    // Envolver todo en OTRO Scaffold más generaba Scaffolds anidados — cada uno reservaba su propio
+    // padding de barras de sistema y el resultado eran listas visualmente mucho más cortas de lo que
+    // debían ser (bug reportado tras probar en dispositivo).
+    val bottomBar: @Composable () -> Unit = {
+        if (activeTab != null) {
+            WalletBottomNavigationBar(
+                activeTab = activeTab,
+                onSelectTab = { tab ->
+                    screen = when (tab) {
+                        BottomNavTab.Accounts -> Screen.AccountsList
+                        BottomNavTab.Transactions -> Screen.TransactionsList
+                        BottomNavTab.Categories -> Screen.CategoriesList
+                    }
+                }
+            )
+        }
+    }
+    val onLogout: () -> Unit = {
+        authViewModel.logout()
+        screen = Screen.Login
+    }
+
     when (val current = screen) {
         Screen.Login -> LoginScreen(
-            onLoggedIn = { screen = Screen.Home },
+            onLoggedIn = { screen = Screen.AccountsList },
             onNavigateToRegister = { screen = Screen.Register }
         )
         Screen.Register -> RegisterScreen(
             onRegistered = { screen = Screen.Login }
         )
-        Screen.Home -> HomeScreen(
-            onLoggedOut = { screen = Screen.Login },
-            onOpenAccounts = { screen = Screen.AccountsList },
-            onOpenCategories = { screen = Screen.CategoriesList },
-            onOpenTransactions = { screen = Screen.TransactionsList }
-        )
         Screen.AccountsList -> AccountListScreen(
             onAddAccount = { screen = Screen.AccountForm() },
-            onEditAccount = { screen = Screen.AccountForm(it) }
+            onEditAccount = { screen = Screen.AccountForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
         )
         is Screen.AccountForm -> AccountFormScreen(
             existingAccount = current.account,
@@ -136,7 +164,9 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
         )
         Screen.CategoriesList -> CategoryListScreen(
             onAddCategory = { screen = Screen.CategoryForm() },
-            onEditCategory = { screen = Screen.CategoryForm(it) }
+            onEditCategory = { screen = Screen.CategoryForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
         )
         is Screen.CategoryForm -> CategoryFormScreen(
             existingCategory = current.category,
@@ -146,7 +176,9 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
         )
         Screen.TransactionsList -> TransactionListScreen(
             onAddTransaction = { screen = Screen.TransactionForm() },
-            onEditTransaction = { screen = Screen.TransactionForm(it) }
+            onEditTransaction = { screen = Screen.TransactionForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
         )
         is Screen.TransactionForm -> TransactionFormScreen(
             existingTransaction = current.transaction,
@@ -158,37 +190,29 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
     }
 }
 
+// material-icons-core solo trae ~48 íconos (verificado durante la implementación) — no hay uno de
+// "categorías"/grilla, así que esa pestaña usa un símbolo de texto en vez de material-icons-extended
+// (research.md #4 de la feature 008: se prioriza no sumar esa dependencia pesada).
 @Composable
-private fun HomeScreen(
-    onLoggedOut: () -> Unit,
-    onOpenAccounts: () -> Unit,
-    onOpenCategories: () -> Unit,
-    onOpenTransactions: () -> Unit,
-    viewModel: AuthViewModel = hiltViewModel()
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(text = "Wallet", style = MaterialTheme.typography.headlineSmall)
-
-        Button(onClick = onOpenTransactions, modifier = Modifier.fillMaxWidth()) {
-            Text("Mis movimientos")
-        }
-        Button(onClick = onOpenAccounts, modifier = Modifier.fillMaxWidth()) {
-            Text("Mis cuentas")
-        }
-        Button(onClick = onOpenCategories, modifier = Modifier.fillMaxWidth()) {
-            Text("Mis categorías")
-        }
-        OutlinedButton(
-            onClick = {
-                viewModel.logout()
-                onLoggedOut()
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Cerrar sesión")
-        }
+private fun WalletBottomNavigationBar(activeTab: BottomNavTab, onSelectTab: (BottomNavTab) -> Unit) {
+    NavigationBar {
+        NavigationBarItem(
+            selected = activeTab == BottomNavTab.Accounts,
+            onClick = { onSelectTab(BottomNavTab.Accounts) },
+            icon = { Icon(Icons.Default.AccountBox, contentDescription = null) },
+            label = { Text("Cuentas") }
+        )
+        NavigationBarItem(
+            selected = activeTab == BottomNavTab.Transactions,
+            onClick = { onSelectTab(BottomNavTab.Transactions) },
+            icon = { Icon(Icons.Default.List, contentDescription = null) },
+            label = { Text("Movimientos") }
+        )
+        NavigationBarItem(
+            selected = activeTab == BottomNavTab.Categories,
+            onClick = { onSelectTab(BottomNavTab.Categories) },
+            icon = { Text("▦", style = MaterialTheme.typography.titleMedium) },
+            label = { Text("Categorías") }
+        )
     }
 }
