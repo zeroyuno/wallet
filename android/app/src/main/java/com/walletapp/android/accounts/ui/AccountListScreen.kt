@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +50,7 @@ fun AccountListScreen(
     onAddAccount: () -> Unit = {},
     onEditAccount: (AccountResponse) -> Unit = {},
     onLogout: () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
     viewModel: AccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -68,11 +69,12 @@ fun AccountListScreen(
                     // No hay pantalla de configuración todavía — el ícono cumple la función de
                     // cerrar sesión, que antes vivía en el menú Home ya eliminado (feature 008).
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Settings, contentDescription = "Cerrar sesión")
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
                     }
                 }
             )
         },
+        bottomBar = bottomBar,
         floatingActionButton = {
             FloatingActionButton(onClick = onAddAccount) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar cuenta")
@@ -87,7 +89,10 @@ fun AccountListScreen(
                     if (current.accounts.isEmpty()) {
                         Text(text = "Todavía no tenés cuentas. Tocá + para crear la primera.")
                     } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             items(current.accounts, key = { it.account.id }) { entry ->
                                 AccountRow(entry = entry, onClick = { onEditAccount(entry.account) })
                             }

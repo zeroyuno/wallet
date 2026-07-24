@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +40,7 @@ fun CategoryListScreen(
     onAddCategory: () -> Unit = {},
     onEditCategory: (CategoryResponse) -> Unit = {},
     onLogout: () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
     viewModel: CategoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -50,11 +51,12 @@ fun CategoryListScreen(
                 title = { Text("Categorías") },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Settings, contentDescription = "Cerrar sesión")
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
                     }
                 }
             )
         },
+        bottomBar = bottomBar,
         floatingActionButton = {
             FloatingActionButton(onClick = onAddCategory) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar categoría")
@@ -72,7 +74,10 @@ fun CategoryListScreen(
                         val byId = current.categories.associateBy { it.id }
                         val expenses = current.categories.filter { it.type == CategoryType.EXPENSE }
                         val incomes = current.categories.filter { it.type == CategoryType.INCOME }
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             categorySection(title = "Gastos", categories = expenses, byId = byId, onEditCategory = onEditCategory)
                             categorySection(title = "Ingresos", categories = incomes, byId = byId, onEditCategory = onEditCategory)
                         }

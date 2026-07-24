@@ -17,7 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -51,6 +51,8 @@ import com.walletapp.android.transactions.SyncUiState
 import com.walletapp.android.transactions.TransactionFilter
 import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.TransactionViewModel
+import java.time.LocalDate
+import java.time.format.TextStyle
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +61,7 @@ fun TransactionListScreen(
     onAddTransaction: () -> Unit = {},
     onEditTransaction: (TransactionResponse) -> Unit = {},
     onLogout: () -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
     viewModel: TransactionViewModel = hiltViewModel(),
     accountViewModel: AccountViewModel = hiltViewModel(),
     categoryViewModel: CategoryViewModel = hiltViewModel()
@@ -77,11 +80,12 @@ fun TransactionListScreen(
                 title = { Text("Movimientos") },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Settings, contentDescription = "Cerrar sesión")
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
                     }
                 }
             )
         },
+        bottomBar = bottomBar,
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTransaction) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar movimiento")
@@ -190,10 +194,27 @@ fun TransactionListScreen(
                 if (transactions.itemCount == 0) {
                     Text(text = "Todavía no tenés movimientos. Tocá + para registrar el primero.")
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         items(count = transactions.itemCount, key = transactions.itemKey { it.id }) { index ->
                             val transaction = transactions[index] ?: return@items
                             val category = categories.find { it.id == transaction.categoryId }
+                            // Encabezado de fecha (research del diseño de Stitch: "Hoy", "Ayer", fecha) —
+                            // la lista ya viene ordenada por fecha DESC desde Room, así que alcanza con
+                            // comparar contra el ítem anterior sin recalcular sobre toda la colección.
+                            // peek() en vez de operator get() para no disparar carga/tracking de Paging 3
+                            // sobre una fila que no se está por mostrar todavía.
+                            val previousDate = if (index == 0) null else transactions.peek(index - 1)?.date
+                            if (transaction.date != previousDate) {
+                                Text(
+                                    text = formatDateHeader(transaction.date),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp, bottom = 4.dp)
+                                )
+                            }
                             TransactionRow(
                                 transaction = transaction,
                                 accountName = accounts.find { it.id == transaction.accountId }?.name,
@@ -204,6 +225,21 @@ fun TransactionListScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// "Hoy"/"Ayer" o fecha en español (ej. "21 de julio") — mismo criterio de agrupado que el mockup de
+// Stitch ("Today, Oct 24" / "Yesterday, Oct 23" / "Oct 21"), adaptado al idioma de la app.
+private fun formatDateHeader(isoDate: String): String {
+    val date = runCatching { LocalDate.parse(isoDate) }.getOrNull() ?: return isoDate
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "Hoy"
+        today.minusDays(1) -> "Ayer"
+        else -> {
+            val month = date.month.getDisplayName(TextStyle.FULL, Locale("es"))
+            "${date.dayOfMonth} de $month" + if (date.year != today.year) " de ${date.year}" else ""
         }
     }
 }

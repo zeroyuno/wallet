@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.List
@@ -16,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -114,76 +112,74 @@ private fun WalletApp(authViewModel: AuthViewModel = hiltViewModel()) {
         return
     }
 
-    Scaffold(
-        bottomBar = {
-            if (activeTab != null) {
-                WalletBottomNavigationBar(
-                    activeTab = activeTab,
-                    onSelectTab = { tab ->
-                        screen = when (tab) {
-                            BottomNavTab.Accounts -> Screen.AccountsList
-                            BottomNavTab.Transactions -> Screen.TransactionsList
-                            BottomNavTab.Categories -> Screen.CategoriesList
-                        }
+    // Sin Scaffold acá: cada pantalla principal ya tiene el suyo propio (topBar/FAB/bottomBar).
+    // Envolver todo en OTRO Scaffold más generaba Scaffolds anidados — cada uno reservaba su propio
+    // padding de barras de sistema y el resultado eran listas visualmente mucho más cortas de lo que
+    // debían ser (bug reportado tras probar en dispositivo).
+    val bottomBar: @Composable () -> Unit = {
+        if (activeTab != null) {
+            WalletBottomNavigationBar(
+                activeTab = activeTab,
+                onSelectTab = { tab ->
+                    screen = when (tab) {
+                        BottomNavTab.Accounts -> Screen.AccountsList
+                        BottomNavTab.Transactions -> Screen.TransactionsList
+                        BottomNavTab.Categories -> Screen.CategoriesList
                     }
-                )
-            }
+                }
+            )
         }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            when (val current = screen) {
-                Screen.Login -> LoginScreen(
-                    onLoggedIn = { screen = Screen.AccountsList },
-                    onNavigateToRegister = { screen = Screen.Register }
-                )
-                Screen.Register -> RegisterScreen(
-                    onRegistered = { screen = Screen.Login }
-                )
-                Screen.AccountsList -> AccountListScreen(
-                    onAddAccount = { screen = Screen.AccountForm() },
-                    onEditAccount = { screen = Screen.AccountForm(it) },
-                    onLogout = {
-                        authViewModel.logout()
-                        screen = Screen.Login
-                    }
-                )
-                is Screen.AccountForm -> AccountFormScreen(
-                    existingAccount = current.account,
-                    onSaved = { screen = Screen.AccountsList },
-                    onDeleted = { screen = Screen.AccountsList },
-                    onCancel = { screen = Screen.AccountsList }
-                )
-                Screen.CategoriesList -> CategoryListScreen(
-                    onAddCategory = { screen = Screen.CategoryForm() },
-                    onEditCategory = { screen = Screen.CategoryForm(it) },
-                    onLogout = {
-                        authViewModel.logout()
-                        screen = Screen.Login
-                    }
-                )
-                is Screen.CategoryForm -> CategoryFormScreen(
-                    existingCategory = current.category,
-                    onSaved = { screen = Screen.CategoriesList },
-                    onDeleted = { screen = Screen.CategoriesList },
-                    onCancel = { screen = Screen.CategoriesList }
-                )
-                Screen.TransactionsList -> TransactionListScreen(
-                    onAddTransaction = { screen = Screen.TransactionForm() },
-                    onEditTransaction = { screen = Screen.TransactionForm(it) },
-                    onLogout = {
-                        authViewModel.logout()
-                        screen = Screen.Login
-                    }
-                )
-                is Screen.TransactionForm -> TransactionFormScreen(
-                    existingTransaction = current.transaction,
-                    onSaved = { screen = Screen.TransactionsList },
-                    onDeleted = { screen = Screen.TransactionsList },
-                    onCancel = { screen = Screen.TransactionsList },
-                    onNavigateToCreateAccount = { screen = Screen.AccountForm() }
-                )
-            }
-        }
+    }
+    val onLogout: () -> Unit = {
+        authViewModel.logout()
+        screen = Screen.Login
+    }
+
+    when (val current = screen) {
+        Screen.Login -> LoginScreen(
+            onLoggedIn = { screen = Screen.AccountsList },
+            onNavigateToRegister = { screen = Screen.Register }
+        )
+        Screen.Register -> RegisterScreen(
+            onRegistered = { screen = Screen.Login }
+        )
+        Screen.AccountsList -> AccountListScreen(
+            onAddAccount = { screen = Screen.AccountForm() },
+            onEditAccount = { screen = Screen.AccountForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
+        )
+        is Screen.AccountForm -> AccountFormScreen(
+            existingAccount = current.account,
+            onSaved = { screen = Screen.AccountsList },
+            onDeleted = { screen = Screen.AccountsList },
+            onCancel = { screen = Screen.AccountsList }
+        )
+        Screen.CategoriesList -> CategoryListScreen(
+            onAddCategory = { screen = Screen.CategoryForm() },
+            onEditCategory = { screen = Screen.CategoryForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
+        )
+        is Screen.CategoryForm -> CategoryFormScreen(
+            existingCategory = current.category,
+            onSaved = { screen = Screen.CategoriesList },
+            onDeleted = { screen = Screen.CategoriesList },
+            onCancel = { screen = Screen.CategoriesList }
+        )
+        Screen.TransactionsList -> TransactionListScreen(
+            onAddTransaction = { screen = Screen.TransactionForm() },
+            onEditTransaction = { screen = Screen.TransactionForm(it) },
+            onLogout = onLogout,
+            bottomBar = bottomBar
+        )
+        is Screen.TransactionForm -> TransactionFormScreen(
+            existingTransaction = current.transaction,
+            onSaved = { screen = Screen.TransactionsList },
+            onDeleted = { screen = Screen.TransactionsList },
+            onCancel = { screen = Screen.TransactionsList },
+            onNavigateToCreateAccount = { screen = Screen.AccountForm() }
+        )
     }
 }
 
