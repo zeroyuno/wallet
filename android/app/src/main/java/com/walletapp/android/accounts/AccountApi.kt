@@ -18,6 +18,15 @@ fun AccountType.displayLabel(): String = when (this) {
     AccountType.OTHER -> "Otro"
 }
 
+// Sin material-icons-extended (research.md #4 de la feature 008) — un emoji por tipo de cuenta
+// cumple el mismo rol visual que un ícono vectorial para esta escala de app.
+fun AccountType.emoji(): String = when (this) {
+    AccountType.CASH -> "💵"
+    AccountType.BANK -> "🏦"
+    AccountType.CREDIT_CARD -> "💳"
+    AccountType.OTHER -> "📦"
+}
+
 @Serializable
 data class AccountRequest(
     val name: String,
