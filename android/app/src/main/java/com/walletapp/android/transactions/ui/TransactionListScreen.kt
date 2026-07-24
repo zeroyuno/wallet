@@ -17,14 +17,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,10 +53,12 @@ import com.walletapp.android.transactions.TransactionResponse
 import com.walletapp.android.transactions.TransactionViewModel
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListScreen(
     onAddTransaction: () -> Unit = {},
     onEditTransaction: (TransactionResponse) -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: TransactionViewModel = hiltViewModel(),
     accountViewModel: AccountViewModel = hiltViewModel(),
     categoryViewModel: CategoryViewModel = hiltViewModel()
@@ -67,6 +72,16 @@ fun TransactionListScreen(
     val categories = (categoriesState as? CategoriesUiState.Success)?.categories.orEmpty()
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Movimientos") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.Settings, contentDescription = "Cerrar sesión")
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTransaction) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar movimiento")
@@ -74,9 +89,6 @@ fun TransactionListScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp)) {
-            Text(text = "Mis movimientos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
-
             if (accounts.isNotEmpty()) {
                 Text(text = "Filtrar por cuenta", style = MaterialTheme.typography.labelLarge)
                 Row(
@@ -210,12 +222,14 @@ private fun TransactionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // secondary = verde (éxito/ingreso), error = rojo (gasto) — roles del sistema de diseño
+            // Midnight FinTech (DESIGN.md), no el color primario genérico de la app.
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isIncome) MaterialTheme.colorScheme.primaryContainer
+                        if (isIncome) MaterialTheme.colorScheme.secondaryContainer
                         else MaterialTheme.colorScheme.errorContainer
                     ),
                 contentAlignment = Alignment.Center
@@ -225,7 +239,7 @@ private fun TransactionRow(
                 Text(
                     text = if (isIncome) "↓" else "↑",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = if (isIncome) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
                 )
             }
             // weight(1f) es lo que evita que un texto largo empuje el monto a un espacio casi nulo
@@ -250,7 +264,7 @@ private fun TransactionRow(
                     String.format(Locale.getDefault(), "%.2f", transaction.amount)
                 }",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isIncome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (isIncome) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
                 maxLines = 1
             )
         }
